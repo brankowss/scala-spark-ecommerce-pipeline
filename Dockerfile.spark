@@ -1,0 +1,21 @@
+# Dockerfile.spark 
+
+# Use the Bitnami Spark image as a base, which already includes Java and Scala.
+FROM bitnami/spark:3.5
+
+# Switch to the root user to install packages.
+USER root
+
+# Copy our custom JAR drivers (e.g., for PostgreSQL) into a folder that Spark automatically reads.
+COPY ./jars /opt/bitnami/spark/jars/
+
+# Copy the folder where our Scala application code will reside.
+COPY ./spark-apps/scala /opt/bitnami/spark/apps/
+
+# Create a 'spark' user with a proper home directory.
+# This is a best practice to prevent permission issues.
+RUN groupadd --gid 1001 spark && \
+    useradd --uid 1001 --gid 1001 --shell /bin/bash --create-home spark
+
+# Switch back to the 'spark' user for execution.
+USER spark

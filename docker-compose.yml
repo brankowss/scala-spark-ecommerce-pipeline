@@ -1,0 +1,144 @@
+# docker-compose.yml 
+
+services:
+  # --- HDFS Cluster ---
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    volumes:
+      - hadoop_namenode_data:/hadoop/dfs/name
+      - ./generated_data:/tmp/data_in 
+    environment:
+      - CLUSTER_NAME=test
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    networks:
+      - data-pipeline-network
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    depends_on:
+      - namenode
+    volumes:
+      - hadoop_datanode_data:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+      CORE_CONF_fs_defaultFS: "hdfs://namenode:9000"
+    networks:
+      - data-pipeline-network
+
+  # --- Hive Metastore ---
+  hive-metastore-db:
+    image: postgres:13-alpine
+    container_name: hive-metastore-db
+    volumes:
+      - hive_metastore_db_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=metastore
+      - POSTGRES_USER=hive
+      - POSTGRES_PASSWORD=hive
+    networks:
+      - data-pipeline-network
+
+  hive-server:
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    container_name: hive-server
+    depends_on:
+      - hive-metastore-db
+      - namenode
+      - datanode
+    environment:
+      - HIVE_CORE_CONF_javax_jdo_option_ConnectionURL=jdbc:postgresql://hive-metastore-db/metastore
+      - HIVE_CORE_CONF_javax_jdo_option_ConnectionDriverName=org.postgresql.Driver
+      - HIVE_CORE_CONF_javax_jdo_option_ConnectionUserName=hive
+      - HIVE_CORE_CONF_javax_jdo_option_ConnectionPassword=hive
+      - HIVE_CORE_CONF_hive_metastore_uris=thrift://hive-server:9083 # Note: Hive Server refers to itself for the metastore URI
+    ports:
+      - "10000:10000"
+    networks:
+      - data-pipeline-network
+
+  # --- Spark Cluster ---
+  spark-master:
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
+    image: my-scala-spark-image:latest
+    container_name: spark-master
+    ports:
+      - "8081:8080"
+      - "7077:7077"
+    volumes:
+      - ./spark-apps/scala:/opt/bitnami/spark/apps
+    networks:
+      - data-pipeline-network
+
+  spark-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
+    image: my-scala-spark-image:latest
+    container_name: spark-worker
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    volumes:
+      - ./spark-apps/scala:/opt/bitnami/spark/apps
+    networks:
+      - data-pipeline-network
+  
+  # --- Data Warehouse & BI ---
+  postgres-warehouse:
+    image: postgres:13-alpine
+    container_name: postgres-warehouse
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_data_p2:/var/lib/postgresql/data
+    networks:
+      - data-pipeline-network
+      
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres-warehouse
+    volumes: 
+      - metabase_data_p2:/var/lib/postgresql/data
+    networks:
+      - data-pipeline-network
+
+  # --- Orchestration ---
+  jenkins:
+    image: jenkins/jenkins:lts-jdk11
+    container_name: jenkins
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+    networks:
+      - data-pipeline-network
+
+volumes:
+  hadoop_namenode_data:
+  hadoop_datanode_data:
+  hive_metastore_db_data:
+  postgres_data_p2:
+  metabase_data_p2:
+  jenkins_data:
+
+networks:
+  data-pipeline-network:
+    driver: bridge

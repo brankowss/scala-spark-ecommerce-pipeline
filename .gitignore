@@ -1,0 +1,24 @@
+# Environment file with secrets
+.env
+
+# Generated data from the python script
+/generated_data/
+
+# Dependencies (downloaded JARs)
+/jars/
+
+# Runtime data and log folders
+/hadoop_data/
+/postgres_data_p2/
+
+# Log files
+*.log
+
+# Scala build folder
+/target/
+
+# IDE and OS specific files
+.idea/
+.vscode/
+__pycache__/
+*.pyc
