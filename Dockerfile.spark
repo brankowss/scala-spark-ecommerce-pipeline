@@ -1,21 +1,37 @@
 # Dockerfile.spark 
 
-# Use the Bitnami Spark image as a base, which already includes Java and Scala.
+# Use the Bitnami Spark image as a base
 FROM bitnami/spark:3.5
 
-# Switch to the root user to install packages.
+# Switch to the root user to install packages
 USER root
 
-# Copy our custom JAR drivers (e.g., for PostgreSQL) into a folder that Spark automatically reads.
+# --- Install sbt (Scala Build Tool) ---
+RUN apt-get update && \
+    apt-get install -y curl gnupg apt-transport-https && \
+    curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalasbt-release.gpg --import && \
+    chmod 644 /etc/apt/trusted.gpg.d/scalasbt-release.gpg && \
+    echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | tee /etc/apt/sources.list.d/sbt.list && \
+    apt-get update && \
+    apt-get install -y sbt && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy our custom JAR drivers
 COPY ./jars /opt/bitnami/spark/jars/
 
-# Copy the folder where our Scala application code will reside.
-COPY ./spark-apps/scala /opt/bitnami/spark/apps/
+# Copy our application source code and build file
+COPY ./spark-apps /opt/bitnami/spark/apps/
 
-# Create a 'spark' user with a proper home directory.
-# This is a best practice to prevent permission issues.
+# Change permissions to allow any user (like our 'spark' user)
+RUN chmod -R 777 /opt/bitnami/spark/apps
+
+# Create a 'spark' user with a proper home directory
 RUN groupadd --gid 1001 spark && \
     useradd --uid 1001 --gid 1001 --shell /bin/bash --create-home spark
 
-# Switch back to the 'spark' user for execution.
+# --- SET THE HOME ENVIRONMENT VARIABLE ---
+ENV HOME /home/spark
+
+# Switch back to the 'spark' user for execution
 USER spark

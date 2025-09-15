@@ -13,9 +13,12 @@
 
 # Log files
 *.log
+derby.log
 
-# Scala build folder
-/target/
+# Scala/sbt build folders and artifacts
+/spark-apps/target/
+/spark-apps/project/
+/spark-apps/metastore_db/
 
 # IDE and OS specific files
 .idea/

@@ -9,11 +9,19 @@ object IngestTransactions {
     
     // 1. Create SparkSession with Hive support
     val spark = SparkSession.builder
+      // Set a name for the application, which will appear in the Spark UI.
       .appName("HDFS to Hive Ingestion")
-      .config("spark.sql.warehouse.dir", "/user/hive/warehouse") // Point to the Hive warehouse directory on HDFS
-      .enableHiveSupport() // Crucial for enabling Hive integration
+      // Configure the default location for Hive tables on HDFS.
+      // Both Spark and Hive properties are set for robustness.
+      .config("spark.sql.warehouse.dir", "hdfs://namenode:9000/user/hive/warehouse")
+      .config("hive.metastore.warehouse.dir", "hdfs://namenode:9000/user/hive/warehouse")
+      // Provide the URI for the external Hive Metastore service.
+      .config("hive.metastore.uris", "thrift://hive-metastore:9083")
+      // Enable integration with the Hive Metastore, allowing Spark to work with Hive tables.
+      .enableHiveSupport()
+      // Build the SparkSession, or get it if it already exists.
       .getOrCreate()
-      
+        
     println("SparkSession created with Hive support.")
 
     // 2. Define the schema for the raw text data
