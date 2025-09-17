@@ -70,7 +70,7 @@ services:
     networks:
       - data-pipeline-network
 
-  # --- Spark Cluster: The Processing Engine ---
+# --- Spark Cluster: The Processing Engine ---
   spark-master:
     build:
       context: .
@@ -79,6 +79,12 @@ services:
     container_name: spark-master
     env_file:
       - ./hadoop-hive.env
+    environment:
+      - SPARK_MODE=master
+      # Pass PostgreSQL credentials to the Spark driver
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     ports:
       - "8081:8080"  # Spark Master Web UI
       - "7077:7077"  # Spark Master RPC Port
@@ -100,6 +106,10 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
+      # Pass PostgreSQL credentials to the Spark executors
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - ./spark-apps:/opt/bitnami/spark/apps
     networks:
