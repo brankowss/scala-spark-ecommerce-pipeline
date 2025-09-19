@@ -144,13 +144,22 @@ services:
 
   # --- Orchestration ---
   jenkins:
-    image: jenkins/jenkins:lts-jdk11
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins # Build from our new Dockerfile
     container_name: jenkins
+    depends_on:
+      - spark-master
+      - hive-server
+      - namenode
+      - datanode
     ports:
       - "8080:8080"  # Jenkins Web UI
       - "50000:50000"  # Port for Jenkins agents
     volumes:
       - jenkins_data:/var/jenkins_home  # Persists Jenkins configuration and jobs
+      # Mount the Docker socket to allow Jenkins to run Docker commands
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - data-pipeline-network
 
