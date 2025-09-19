@@ -1,0 +1,20 @@
+# Dockerfile.jenkins
+
+# Start from the official Jenkins Long-Term Support image
+FROM jenkins/jenkins:lts-jdk11
+
+# Switch to the root user to install packages
+USER root
+
+# Install Python3, Docker client, Docker Compose, and core utilities (for timeout command)
+RUN apt-get update && apt-get install -y python3 python3-pip docker.io coreutils
+
+# --- INSTALL DOCKER COMPOSE ---
+RUN curl -L "https://github.com/docker/compose/releases/download/v2.21.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+RUN chmod +x /usr/local/bin/docker-compose
+
+# Add the 'jenkins' user to the 'docker' group so it can run docker commands
+RUN usermod -aG docker jenkins
+
+# Switch back to the jenkins user for normal operation
+USER jenkins
