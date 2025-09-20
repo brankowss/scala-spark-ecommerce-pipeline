@@ -4,7 +4,8 @@ pipeline {
     environment {
         HDFS_DIM_DIR   = "/user/spark/raw_dimensions"
         HDFS_TRANS_DIR = "/user/spark/raw_transactions"
-        WORKSPACE_DIR  = "${env.WORKSPACE}/generated_data"
+        WORKSPACE_DIR  = "${env.WORKSPACE}/generated_data" // Jenkins workspace path for generated data
+        NAMENODE_DATA  = "/tmp/data_in" // Path inside namenode container
     }
 
     stages {
@@ -33,19 +34,19 @@ pipeline {
                     docker exec namenode hdfs dfs -mkdir -p ${HDFS_DIM_DIR}
                     docker exec namenode hdfs dfs -mkdir -p ${HDFS_TRANS_DIR}
 
-                    # Upload dimension CSV files
-                    docker exec -i namenode hdfs dfs -put -f ${WORKSPACE_DIR}/countries.csv ${HDFS_DIM_DIR}/countries.csv
-                    docker exec -i namenode hdfs dfs -put -f ${WORKSPACE_DIR}/product_info.csv ${HDFS_DIM_DIR}/product_info.csv
+                    # Upload dimension CSV files from mounted folder
+                    docker exec -i namenode hdfs dfs -put -f ${NAMENODE_DATA}/countries.csv ${HDFS_DIM_DIR}/countries.csv
+                    docker exec -i namenode hdfs dfs -put -f ${NAMENODE_DATA}/product_info.csv ${HDFS_DIM_DIR}/product_info.csv
 
-                    # Upload all transaction TXT files (preserve filenames)
-                    for f in ${WORKSPACE_DIR}/invoice_*.txt; do
+                    # Upload transaction TXT files (preserve filenames)
+                    for f in ${NAMENODE_DATA}/invoice_*.txt; do
                         docker exec -i namenode hdfs dfs -put -f "$f" ${HDFS_TRANS_DIR}/$(basename $f)
                     done
 
                     echo "--- HDFS upload complete ---"
                 '''
 
-                echo "--- Verifying uploaded files ---"
+                echo "--- Verifying uploaded files in HDFS ---"
                 sh 'docker exec namenode hdfs dfs -ls ${HDFS_DIM_DIR}/'
                 sh 'docker exec namenode hdfs dfs -ls ${HDFS_TRANS_DIR}/'
             }
