@@ -34,16 +34,20 @@ pipeline {
                     docker exec namenode hdfs dfs -mkdir -p ${HDFS_DIM_DIR}
                     docker exec namenode hdfs dfs -mkdir -p ${HDFS_TRANS_DIR}
 
-                    # Upload dimension CSV files
+                    # Upload dimension CSV files 
                     for csv_file in ${NAMENODE_DATA}/*.csv; do
-                        filename=$(basename "$csv_file")
-                        docker exec -i namenode hdfs dfs -put -f "$csv_file" ${HDFS_DIM_DIR}/"$filename"
+                        if [ -f "$csv_file" ]; then
+                            filename=$(basename "$csv_file")
+                            docker exec -i namenode hdfs dfs -put -f "$csv_file" ${HDFS_DIM_DIR}/"$filename"
+                        fi
                     done
 
-                    # Upload transaction TXT files
+                    # Upload transaction TXT files 
                     for txt_file in ${NAMENODE_DATA}/invoice_*.txt; do
-                        filename=$(basename "$txt_file")
-                        docker exec -i namenode hdfs dfs -put -f "$txt_file" ${HDFS_TRANS_DIR}/"$filename"
+                        if [ -f "$txt_file" ]; then
+                            filename=$(basename "$txt_file")
+                            docker exec -i namenode hdfs dfs -put -f "$txt_file" ${HDFS_TRANS_DIR}/"$filename"
+                        fi
                     done
 
                     echo "--- HDFS upload complete ---"
