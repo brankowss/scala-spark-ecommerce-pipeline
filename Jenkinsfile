@@ -46,10 +46,10 @@ pipeline {
                     
                     # Upload transaction files directly to the correct location 
                     docker compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/invoice_*.txt /user/spark/raw_transactions/'
-                   '''
-
-                    echo "--- HDFS upload complete ---"
                 '''
+
+                echo "--- HDFS upload complete ---"
+            
 
                 echo "--- Verifying uploaded files ---"
                 sh 'docker exec namenode hdfs dfs -ls /user/spark/raw_dimensions/'
@@ -66,7 +66,7 @@ pipeline {
                             echo "--- Running Transaction Ingestion Spark Job ---"
                             docker exec spark-master bash -c "spark-submit \
                                 --class IngestTransactions \
-                                --master spark://spark-master:7_077 \
+                                --master spark://spark-master:7077 \
                                 /opt/bitnami/spark/apps/target/scala-2.12/ecommerce-pipeline-spark-jobs_2.12-1.0.jar"
                         '''
                     }
