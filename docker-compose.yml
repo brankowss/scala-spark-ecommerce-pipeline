@@ -160,6 +160,7 @@ services:
       - jenkins_data:/var/jenkins_home  # Persists Jenkins configuration and jobs
       # Mount the Docker socket to allow Jenkins to run Docker commands
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./generated_data:/var/jenkins_home/workspace/ecommerce-daily-pipeline/generated_data 
     networks:
       - data-pipeline-network
 
