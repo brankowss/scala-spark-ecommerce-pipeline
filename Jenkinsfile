@@ -5,7 +5,6 @@ pipeline {
         HDFS_DIM_DIR   = "/user/spark/raw_dimensions"
         HDFS_TRANS_DIR = "/user/spark/raw_transactions"
         WORKSPACE_DIR  = "${env.WORKSPACE}/generated_data" // Jenkins workspace path for generated data
-        NAMENODE_DATA  = "/tmp/data_in" // Path inside namenode container
     }
 
     stages {
@@ -34,16 +33,16 @@ pipeline {
                     docker exec namenode hdfs dfs -mkdir -p ${HDFS_DIM_DIR}
                     docker exec namenode hdfs dfs -mkdir -p ${HDFS_TRANS_DIR}
 
-                    # Upload dimension CSV files 
-                    for csv_file in ${NAMENODE_DATA}/*.csv; do
+                    # Upload dimension CSV files from Jenkins workspace
+                    for csv_file in ${WORKSPACE_DIR}/*.csv; do
                         if [ -f "$csv_file" ]; then
                             filename=$(basename "$csv_file")
                             docker exec -i namenode hdfs dfs -put -f "$csv_file" ${HDFS_DIM_DIR}/"$filename"
                         fi
                     done
 
-                    # Upload transaction TXT files 
-                    for txt_file in ${NAMENODE_DATA}/invoice_*.txt; do
+                    # Upload transaction TXT files from Jenkins workspace
+                    for txt_file in ${WORKSPACE_DIR}/invoice_*.txt; do
                         if [ -f "$txt_file" ]; then
                             filename=$(basename "$txt_file")
                             docker exec -i namenode hdfs dfs -put -f "$txt_file" ${HDFS_TRANS_DIR}/"$filename"
@@ -51,11 +50,11 @@ pipeline {
                     done
 
                     echo "--- HDFS upload complete ---"
-                '''
 
-                echo "--- Verifying uploaded files in HDFS ---"
-                sh 'docker exec namenode hdfs dfs -ls ${HDFS_DIM_DIR}/'
-                sh 'docker exec namenode hdfs dfs -ls ${HDFS_TRANS_DIR}/'
+                    # Verify uploads
+                    docker exec namenode hdfs dfs -ls ${HDFS_DIM_DIR}/
+                    docker exec namenode hdfs dfs -ls ${HDFS_TRANS_DIR}/
+                '''
             }
         }
 
