@@ -30,31 +30,28 @@ pipeline {
                 echo "--- Uploading all files to HDFS ---"
                 sh '''
                     # Create HDFS directories
-                    docker exec namenode hdfs dfs -mkdir -p ${HDFS_DIM_DIR}
-                    docker exec namenode hdfs dfs -mkdir -p ${HDFS_TRANS_DIR}
+                    docker exec namenode hdfs dfs -mkdir -p /user/spark/raw_dimensions
+                    docker exec namenode hdfs dfs -mkdir -p /user/spark/raw_transactions
 
-                    # Upload dimension CSV files from Jenkins workspace
-                    for csv_file in ${WORKSPACE_DIR}/*.csv; do
-                        if [ -f "$csv_file" ]; then
-                            filename=$(basename "$csv_file")
-                            docker exec -i namenode hdfs dfs -put -f "$csv_file" ${HDFS_DIM_DIR}/"$filename"
-                        fi
-                    done
+                    # Stream dimension CSV files from Jenkins workspace to HDFS
+                    cat generated_data/countries.csv | docker exec -i namenode hdfs dfs -put -f - /user/spark/raw_dimensions/countries.csv
+                    cat generated_data/product_info.csv | docker exec -i namenode hdfs dfs -put -f - /user/spark/raw_dimensions/product_info.csv
 
-                    # Upload transaction TXT files from Jenkins workspace
-                    for txt_file in ${WORKSPACE_DIR}/invoice_*.txt; do
-                        if [ -f "$txt_file" ]; then
-                            filename=$(basename "$txt_file")
-                            docker exec -i namenode hdfs dfs -put -f "$txt_file" ${HDFS_TRANS_DIR}/"$filename"
+                    # Loop through transaction files and stream each one individually
+                    for f in generated_data/invoice_*.txt; do
+                        if [ -f "$f" ]; then
+                            filename=$(basename "$f")
+                            echo "Uploading $filename to HDFS..."
+                            cat "$f" | docker exec -i namenode hdfs dfs -put -f - "/user/spark/raw_transactions/$filename"
                         fi
                     done
 
                     echo "--- HDFS upload complete ---"
-
-                    # Verify uploads
-                    docker exec namenode hdfs dfs -ls ${HDFS_DIM_DIR}/
-                    docker exec namenode hdfs dfs -ls ${HDFS_TRANS_DIR}/
                 '''
+
+                echo "--- Verifying uploaded files in HDFS ---"
+                sh 'docker exec namenode hdfs dfs -ls /user/spark/raw_dimensions/'
+                sh 'docker exec namenode hdfs dfs -ls /user/spark/raw_transactions/'
             }
         }
 
