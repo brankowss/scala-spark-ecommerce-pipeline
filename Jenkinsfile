@@ -36,26 +36,24 @@ pipeline {
 
                 echo "--- Uploading all data to HDFS ---"
                 sh '''
-                    # Create HDFS directories if they don't exist.
-                    docker exec namenode hdfs dfs -mkdir -p /user/spark/raw_dimensions
-                    docker exec namenode hdfs dfs -mkdir -p /user/spark/raw_transactions/data_in
-
-                    # Upload dimension CSV files by streaming them from the workspace into HDFS.
-                    # The '-f' flag overwrites the files if they already exist.
-                    cat ${WORKSPACE}/generated_data/countries.csv | docker exec -i namenode hdfs dfs -put -f - /user/spark/raw_dimensions/countries.csv
-                    cat ${WORKSPACE}/generated_data/product_info.csv | docker exec -i namenode hdfs dfs -put -f - /user/spark/raw_dimensions/product_info.csv
-
-                    # Upload all generated transaction TXT files into the target directory.
-                    for f in ${WORKSPACE}/generated_data/invoice_*.txt; do
-                        cat "$f" | docker exec -i namenode hdfs dfs -put -f - /user/spark/raw_transactions/data_in/
-                    done
+                    echo "--- Uploading all files to HDFS ---"
+                    # Create BOTH directories at once
+                    docker compose exec namenode sh -c 'hdfs dfs -mkdir -p /user/spark/raw_dimensions /user/spark/raw_transactions'
+                    
+                    # Upload dimension files
+                    docker compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/countries.csv /user/spark/raw_dimensions/'
+                    docker compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/product_info.csv /user/spark/raw_dimensions/'
+                    
+                    # Upload transaction files directly to the correct location 
+                    docker compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/invoice_*.txt /user/spark/raw_transactions/'
+                   '''
 
                     echo "--- HDFS upload complete ---"
                 '''
 
                 echo "--- Verifying uploaded files ---"
                 sh 'docker exec namenode hdfs dfs -ls /user/spark/raw_dimensions/'
-                sh 'docker exec namenode hdfs dfs -ls /user/spark/raw_transactions/data_in/'
+                sh 'docker exec namenode hdfs dfs -ls /user/spark/raw_transactions/'
             }
         }
 
