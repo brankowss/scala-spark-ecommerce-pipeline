@@ -2,11 +2,13 @@ pipeline {
     agent any
 
     environment {
-        HDFS_DIM_DIR   = "/user/spark/raw_dimensions"
-        WORKSPACE_DIR  = "${env.WORKSPACE}/generated_data"
+        HDFS_DIM_DIR  = "/user/spark/raw_dimensions"
+        HDFS_TRANS_DIR = "/user/spark/raw_transactions"
+        WORKSPACE_DIR = "${env.WORKSPACE}/generated_data"
     }
 
     stages {
+
         stage('Checkout SCM') {
             steps {
                 checkout scm
@@ -25,25 +27,27 @@ pipeline {
                     pkill -f data_generator.py || true
                 '''
 
-                echo "--- Uploading all data to HDFS ---"
+                echo "--- Uploading all files to HDFS ---"
                 sh '''
-                    echo "--- Uploading all files to HDFS ---"
-                    # Create BOTH directories at once
-                    docker-compose exec namenode sh -c 'hdfs dfs -mkdir -p /user/spark/raw_dimensions /user/spark/raw_transactions'
-                    
-                    # Upload dimension files
-                    docker-compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/countries.csv /user/spark/raw_dimensions/'
-                    docker-compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/product_info.csv /user/spark/raw_dimensions/'
-                    
-                    # Upload transaction files directly to the correct location 
-                    docker-compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/invoice_*.txt /user/spark/raw_transactions/'
+                    # Create HDFS directories if they don't exist
+                    docker exec namenode hdfs dfs -mkdir -p ${HDFS_DIM_DIR}
+                    docker exec namenode hdfs dfs -mkdir -p ${HDFS_TRANS_DIR}
+
+                    # Upload dimension CSV files
+                    cat ${WORKSPACE_DIR}/countries.csv | docker exec -i namenode hdfs dfs -put -f - ${HDFS_DIM_DIR}/countries.csv
+                    cat ${WORKSPACE_DIR}/product_info.csv | docker exec -i namenode hdfs dfs -put -f - ${HDFS_DIM_DIR}/product_info.csv
+
+                    # Upload all transaction TXT files
+                    for f in ${WORKSPACE_DIR}/invoice_*.txt; do
+                        cat "$f" | docker exec -i namenode hdfs dfs -put -f - ${HDFS_TRANS_DIR}/
+                    done
+
+                    echo "--- HDFS upload complete ---"
                 '''
 
-                echo "--- HDFS upload complete ---"
-
                 echo "--- Verifying uploaded files ---"
-                sh 'docker exec namenode hdfs dfs -ls /user/spark/raw_dimensions/'
-                sh 'docker exec namenode hdfs dfs -ls /user/spark/raw_transactions/'
+                sh 'docker exec namenode hdfs dfs -ls ${HDFS_DIM_DIR}/'
+                sh 'docker exec namenode hdfs dfs -ls ${HDFS_TRANS_DIR}/'
             }
         }
 
@@ -105,7 +109,7 @@ pipeline {
             withCredentials([string(credentialsId: 'NOTIFICATION_EMAIL', variable: 'RECIPIENT_EMAIL')]) {
                 mail to: RECIPIENT_EMAIL,
                      subject: "${currentBuild.result}: Jenkins Pipeline - ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
-                     body: "The pipeline finished with status: ${currentBuild.result}. For details, see the log at: ${env.BUILD_URL}"
+                     body: "The pipeline finished with status: ${currentBuild.result}. Log: ${env.BUILD_URL}"
             }
         }
     }
