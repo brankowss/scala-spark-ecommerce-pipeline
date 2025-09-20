@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        HDFS_DIM_DIR  = "/user/spark/raw_dimensions"
+        HDFS_DIM_DIR   = "/user/spark/raw_dimensions"
         HDFS_TRANS_DIR = "/user/spark/raw_transactions"
-        WORKSPACE_DIR = "${env.WORKSPACE}/generated_data"
+        WORKSPACE_DIR  = "${env.WORKSPACE}/generated_data"
     }
 
     stages {
@@ -34,12 +34,12 @@ pipeline {
                     docker exec namenode hdfs dfs -mkdir -p ${HDFS_TRANS_DIR}
 
                     # Upload dimension CSV files
-                    cat ${WORKSPACE_DIR}/countries.csv | docker exec -i namenode hdfs dfs -put -f - ${HDFS_DIM_DIR}/countries.csv
-                    cat ${WORKSPACE_DIR}/product_info.csv | docker exec -i namenode hdfs dfs -put -f - ${HDFS_DIM_DIR}/product_info.csv
+                    docker exec -i namenode hdfs dfs -put -f ${WORKSPACE_DIR}/countries.csv ${HDFS_DIM_DIR}/countries.csv
+                    docker exec -i namenode hdfs dfs -put -f ${WORKSPACE_DIR}/product_info.csv ${HDFS_DIM_DIR}/product_info.csv
 
-                    # Upload all transaction TXT files
+                    # Upload all transaction TXT files (preserve filenames)
                     for f in ${WORKSPACE_DIR}/invoice_*.txt; do
-                        cat "$f" | docker exec -i namenode hdfs dfs -put -f - ${HDFS_TRANS_DIR}/
+                        docker exec -i namenode hdfs dfs -put -f "$f" ${HDFS_TRANS_DIR}/$(basename $f)
                     done
 
                     echo "--- HDFS upload complete ---"
