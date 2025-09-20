@@ -1,26 +1,18 @@
-// Jenkinsfile 
-
 pipeline {
-    // This tells Jenkins to run the pipeline on any available agent (node).
     agent any
 
-    // Define environment variables for clarity and reusability.
     environment {
         HDFS_DIM_DIR   = "/user/spark/raw_dimensions"
         WORKSPACE_DIR  = "${env.WORKSPACE}/generated_data"
     }
 
     stages {
-
-        // STAGE 0: Get the source code from Git. This is the first step for a production pipeline.
         stage('Checkout SCM') {
             steps {
-                // This built-in step clones/pulls the repository that is configured in the Jenkins job UI.
                 checkout scm
             }
         }
 
-        // Stage 1: Generate all necessary data files for a test run.
         stage('Generate & Upload All Data to HDFS') {
             steps {
                 echo "--- Generating daily dimension files ---"
@@ -28,7 +20,6 @@ pipeline {
 
                 echo "--- Generating a small batch of transaction files ---"
                 sh '''
-                    # Run transaction generator for a short period and then stop it.
                     python3 scripts/data_generator.py --type transactions &
                     sleep 10
                     pkill -f data_generator.py || true
@@ -38,18 +29,17 @@ pipeline {
                 sh '''
                     echo "--- Uploading all files to HDFS ---"
                     # Create BOTH directories at once
-                    docker compose exec namenode sh -c 'hdfs dfs -mkdir -p /user/spark/raw_dimensions /user/spark/raw_transactions'
+                    docker-compose exec namenode sh -c 'hdfs dfs -mkdir -p /user/spark/raw_dimensions /user/spark/raw_transactions'
                     
                     # Upload dimension files
-                    docker compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/countries.csv /user/spark/raw_dimensions/'
-                    docker compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/product_info.csv /user/spark/raw_dimensions/'
+                    docker-compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/countries.csv /user/spark/raw_dimensions/'
+                    docker-compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/product_info.csv /user/spark/raw_dimensions/'
                     
                     # Upload transaction files directly to the correct location 
-                    docker compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/invoice_*.txt /user/spark/raw_transactions/'
+                    docker-compose exec namenode sh -c 'hdfs dfs -put -f /tmp/data_in/invoice_*.txt /user/spark/raw_transactions/'
                 '''
 
                 echo "--- HDFS upload complete ---"
-            
 
                 echo "--- Verifying uploaded files ---"
                 sh 'docker exec namenode hdfs dfs -ls /user/spark/raw_dimensions/'
@@ -57,7 +47,6 @@ pipeline {
             }
         }
 
-        // Stage 2: Run Spark jobs to create the Bronze layer tables in parallel to save time.
         stage('Process Staging (Bronze) Tables') {
             parallel {
                 stage('Process Transactions') {
@@ -96,7 +85,6 @@ pipeline {
             }
         }
 
-        // Stage 3: Run the main ETL job that joins the bronze tables and loads the final Data Warehouse.
         stage('Load Data Warehouse (Gold Layer)') {
             steps {
                 sh '''
@@ -111,13 +99,10 @@ pipeline {
         }
     }
 
-    // This 'post' block runs after all stages are complete.
     post {
         always {
             echo "Pipeline finished. Sending status email..."
-            // Securely load the credential with the ID 'NOTIFICATION_EMAIL'.
             withCredentials([string(credentialsId: 'NOTIFICATION_EMAIL', variable: 'RECIPIENT_EMAIL')]) {
-                // The built-in 'currentBuild.result' variable will be 'SUCCESS' or 'FAILURE'.
                 mail to: RECIPIENT_EMAIL,
                      subject: "${currentBuild.result}: Jenkins Pipeline - ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
                      body: "The pipeline finished with status: ${currentBuild.result}. For details, see the log at: ${env.BUILD_URL}"
