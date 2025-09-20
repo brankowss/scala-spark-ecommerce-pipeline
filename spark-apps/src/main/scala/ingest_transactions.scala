@@ -36,7 +36,7 @@ object IngestTransactions {
       
     // 3. Read data from HDFS
     // The path points to the directory where our data generator places the files.
-    val rawDataPath = "hdfs://namenode:9000/user/spark/raw_transactions/data_in"
+    val rawDataPath = "hdfs://namenode:9000/user/spark/raw_transactions"
     
     val df_raw = spark.read
       .option("header", "false") // Our files do not have a header row
