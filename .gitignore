@@ -3,6 +3,7 @@
 
 # Generated data from the python script
 /generated_data/
+/reports/
 
 # Dependencies (downloaded JARs)
 /jars/
