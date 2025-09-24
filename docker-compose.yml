@@ -139,7 +139,7 @@ services:
     depends_on:
       - postgres-warehouse
     volumes: 
-      - metabase_data_p2:/var/lib/postgresql/data  # Persists Metabase application data
+      - metabase_data_p2:/metabase-data
     networks:
       - data-pipeline-network
 
