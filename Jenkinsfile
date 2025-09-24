@@ -20,13 +20,7 @@ pipeline {
                 sh 'python3 scripts/data_generator.py --type dimensions'
 
                 sh 'echo "--- Generating a batch of transaction files ---"'
-                // For production, we run the generator in a continuous loop and stop it after a set time.
-                // The '|| true' ensures the pipeline doesn't fail if pkill finds no process to stop.
-                sh '''
-                    python3 scripts/data_generator.py --type transactions &
-                    sleep 30
-                    pkill -f data_generator.py || true
-                '''
+                sh 'python3 scripts/data_generator.py --type transactions'
 
                 // --- TESTING THE EMAIL ALERT ---
                 // To reliably demonstrate the EP-7 business alert feature, the block above can be
