@@ -1,0 +1,51 @@
+// Jenkinsfile-transactions-only
+// This pipeline is designed to run frequently (e.g., every 4 hours).
+// Its only purpose is to ingest new transaction data into the Bronze layer.
+
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Generate & Upload Transactions') {
+            steps {
+                // This pipeline only generates and ingests transaction data.
+                // Run it for a short period to simulate a 4-hour batch.
+                sh 'timeout 1m python3 scripts/data_generator.py --type transactions || true'
+
+                sh '''
+                    echo "--- Uploading new transaction files to HDFS ---"
+                    docker exec namenode hdfs dfs -mkdir -p /user/spark/raw_transactions
+
+                    # Use a loop to upload all newly generated transaction files
+                    for f in generated_data/invoice_*.txt; do
+                        if [ -f "$f" ]; then
+                            filename=$(basename "$f")
+                            cat "$f" | docker exec -i namenode hdfs dfs -put -f - "/user/spark/raw_transactions/$filename"
+                        fi
+                    done
+                '''
+            }
+        }
+        stage('Process Transactions (Bronze Layer)') {
+            steps {
+                // This is the only Spark job this pipeline runs.
+                sh 'docker exec spark-master bash -c "spark-submit --class IngestTransactions --master spark://spark-master:7077 /opt/bitnami/spark/apps/target/scala-2.12/ecommerce-pipeline-spark-jobs_2.12-1.0.jar"'
+            }
+        }
+    }
+    post {
+        // For this frequent job, only want to be notified on failure to avoid spam.
+        failure {
+            withCredentials([string(credentialsId: 'NOTIFICATION_EMAIL', variable: 'NOTIFICATION_EMAIL')]) {
+                mail to: RECIPIENT_EMAIL,
+                     subject: "FAILURE: Jenkins Pipeline - ingest-transactions-4-hourly",
+                     body: "The 4-hourly transaction ingestion pipeline failed. Log: ${env.BUILD_URL}"
+            }
+        }
+    }
+}
