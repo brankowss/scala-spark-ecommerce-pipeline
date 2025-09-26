@@ -12,11 +12,11 @@ This project was developed in distinct phases, managed via Jira:
 
 -   **Phase I: Infrastructure Setup (EP-1):** The initial phase focused on building the entire project environment using Docker and Docker Compose. This included setting up a Spark Cluster, HDFS Data Lake, Hive Metastore with a PostgreSQL backend, a separate PostgreSQL Data Warehouse, Jenkins, and Metabase.
 
--   **Phase II: Bronze Layer Processing (EP-2, EP-3, EP-4):** This phase involved developing the initial Spark (Scala) jobs to ingest raw data from HDFS, clean it, apply a schema, and save it into structured, Parquet-formatted tables in Hive (Bronze Layer).
+-   **Phase II: Bronze Layer Processing & Data Quality (EP-2, EP-3, EP-4, EP-10):** This phase involved developing the initial Spark (Scala) jobs to ingest raw data from HDFS, clean it, apply a schema, and save it into structured, Parquet-formatted tables in Hive (Bronze Layer). This phase was later enhanced with a **data quality check (EP-10)** to identify and quarantine transactions with invalid data, ensuring the integrity of the data entering the warehouse.
 
--   **Phase III: Gold Layer Processing (EP-5):** A main ETL Spark job was created to read from the Bronze layer Hive tables, perform joins and transformations to build a dimensional Star Schema, and load the final, clean data into the PostgreSQL Data Warehouse (Gold Layer).
+-   **Phase III: Gold Layer Processing (EP-5):** A main ETL Spark job was created to read from the clean Bronze layer, perform joins and transformations to build a dimensional Star Schema, and load the final, clean data into the PostgreSQL Data Warehouse (Gold Layer).
 
--   **Phase IV: Orchestration & Alerting (EP-6, EP-7):** Jenkins was configured to create a full CI/CD pipeline. A `Jenkinsfile` was written to automate the entire process from data generation to DWH loading. This phase also included implementing both technical failure email notifications and a business logic alert based on statistical anomaly detection.
+-   **Phase IV: Orchestration & Alerting (EP-6, EP-7, EP-9):** Jenkins was configured to create a full CI/CD pipeline with two separate automated jobs: a **main daily job (EP-6)** for the full ETL process, and a **4-hourly job (EP-9)** for frequent transaction ingestion. This phase also included implementing both technical failure email notifications and a business logic alert based on statistical anomaly detection **(EP-7)**.
 
 -   **Phase V: BI & Visualization (EP-8):** The final core phase involved connecting Metabase to the PostgreSQL Data Warehouse and building an interactive dashboard to answer key business questions about sales, products, and customers.
 

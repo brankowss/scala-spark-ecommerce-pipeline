@@ -77,7 +77,7 @@ def generate_transaction_logs():
                 stock_code = random.choice(list(PRODUCTS.keys()))
                 quantity = random.randint(1, 10)
 
-                # --- NOTE FOR MENTOR: TESTING LOGIC FOR EP-7 ---
+                # --- TESTING LOGIC FOR EP-7 ---
                 # To reliably test the business alert, the following block of code was
                 # temporarily used to guarantee the creation of a high-quantity outlier.
                 # It has been commented out for the final production version.
@@ -89,6 +89,16 @@ def generate_transaction_logs():
                 # --- END OF TESTING LOGIC ---
 
                 country_field = f"{random.choice(list(COUNTRIES.keys()))}-{random.choice(REGIONS)}"
+                
+                # --- TESTING LOGIC FOR EP-10 ---
+                # This logic intentionally creates some transactions with a non-existent CountryID
+                # to verify that the data quality quarantine process is working correctly.
+                # if invoice_counter % 10 == 0: # Make every 10th invoice invalid for the test
+                #     country_field = f"9999-{random.choice(REGIONS)}"
+                # else:
+                #     country_field = f"{random.choice(list(COUNTRIES.keys()))}-{random.choice(REGIONS)}"
+                # --- END OF TESTING LOGIC ---
+
                 line = f"{invoice_counter},{stock_code},{quantity},{invoice_date},{customer_id},{country_field}"
                 invoice_items.append(line)
             

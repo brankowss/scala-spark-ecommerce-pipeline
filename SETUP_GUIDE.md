@@ -158,6 +158,23 @@ This job will run your main `Jenkinsfile` once a day to perform the complete ETL
 5.  Click **Save**.
 6.  You can click **Build Now** to run it once manually and confirm everything works. 
 
+### 5.5. Create the 4-Hourly Transaction Ingestion Job
+This is a separate, more frequent job that only ingests new transaction data, as required by the project. It will use a different, simpler `Jenkinsfile`.
+
+2.  **Create the Jenkins Job:**
+    -   On the Jenkins dashboard, click **New Item**.
+    -   Enter the name **`ingest-transactions-4-hourly`**, select **Pipeline**, and click **OK**.
+    -   In **Build Triggers**:
+        -   Check **Build periodically**.
+        -   In the **Schedule** box, enter `H */4 * * *` (this means "approximately every 4 hours").
+    -   In the **Pipeline** section:
+        -   **Definition**: `Pipeline script from SCM`.
+        -   **SCM**: `Git`.
+        -   **Repository URL**: Your GitHub repository URL.
+        -   **Branch Specifier**: `*/main`.
+        -   **Script Path**: `Jenkinsfile-transactions-only` (This is the crucial step).
+    -   Click **Save**.  
+    
 ## Step 6: Set Up Metabase & Create Dashboards
 
 ### 6.1. Initial Setup
