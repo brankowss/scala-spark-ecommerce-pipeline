@@ -1,0 +1,38 @@
+// Jenkinsfile-backup
+pipeline {
+    agent any
+    triggers {
+        // Schedule to run every Sunday at 2 AM
+        cron('0 2 * * 0')
+    }
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Prepare and Run Backup') {
+            steps {
+                // Create the necessary directories inside the Jenkins workspace before running the script.
+                sh 'mkdir -p backups/postgres backups/hdfs'
+                
+                sh 'chmod +x scripts/run_backup.sh'
+                sh './scripts/run_backup.sh'
+            }
+        }
+    }
+    post {
+        // This block runs only if the pipeline is successful.
+        success {
+            echo "Archiving backup files as artifacts..."
+            archiveArtifacts artifacts: 'backups/**', followSymlinks: false
+        }
+        failure {
+            withCredentials([string(credentialsId: 'NOTIFICATION_EMAIL', variable: 'NOTIFICATION_EMAIL')]) {
+                mail to: NOTIFICATION_EMAIL,
+                     subject: "FAILURE: Jenkins Pipeline - Backup Job",
+                     body: "The weekly backup job failed. Please check the logs: ${env.BUILD_URL}"
+            }
+        }
+    }
+}

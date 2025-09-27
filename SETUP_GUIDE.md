@@ -174,7 +174,25 @@ This is a separate, more frequent job that only ingests new transaction data, as
         -   **Branch Specifier**: `*/main`.
         -   **Script Path**: `Jenkinsfile-transactions-only` (This is the crucial step).
     -   Click **Save**.  
-    
+
+### 5.6. Create the Weekly Backup Job
+
+This is a separate job dedicated to system maintenance. It runs on a weekly schedule to create backups of the critical data stores.
+
+1.  **Create the Jenkins Job:**
+    -   On the Jenkins dashboard, click **New Item**.
+    -   Enter the name **`backup-pipeline`**, select **Pipeline**, and click **OK**.
+    -   In the job configuration page, go to the **Build Triggers** section:
+        -   Check **Build periodically**.
+        -   In the **Schedule** box, enter `0 2 * * 0` (this means "every Sunday at 2 AM").
+    -   Scroll down to the **Pipeline** section:
+        -   **Definition**: `Pipeline script from SCM`.
+        -   **SCM**: `Git`.
+        -   **Repository URL**: Your GitHub repository URL.
+        -   **Branch Specifier**: `*/main`.
+        -   **Script Path**: `Jenkinsfile-backup` (This is the crucial step).
+    -   Click **Save**.  
+
 ## Step 6: Set Up Metabase & Create Dashboards
 
 ### 6.1. Initial Setup

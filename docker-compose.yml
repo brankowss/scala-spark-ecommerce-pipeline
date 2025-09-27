@@ -88,6 +88,7 @@ services:
     ports:
       - "8081:8080"  # Spark Master Web UI
       - "7077:7077"  # Spark Master RPC Port
+      - "4040:4040"  # Spark Application Web UI 
     volumes: 
       - ./spark-apps:/opt/bitnami/spark/apps
       - ./reports:/opt/bitnami/spark/reports
