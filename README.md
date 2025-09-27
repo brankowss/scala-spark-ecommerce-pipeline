@@ -20,6 +20,23 @@ This project was developed in distinct phases, managed via Jira:
 
 -   **Phase V: BI & Visualization (EP-8):** The final core phase involved connecting Metabase to the PostgreSQL Data Warehouse and building an interactive dashboard to answer key business questions about sales, products, and customers.
 
+## DevOps & Maintenance (EP-11)
+
+To ensure the reliability and efficiency of the pipeline, two key DevOps practices were implemented as part of the project's improvement phase.
+
+### Backup Strategy
+A fully automated backup system was created to prevent data loss.
+-   A dedicated Jenkins pipeline (`backup-pipeline`) is scheduled to run weekly.
+-   This pipeline executes a shell script (`scripts/run_backup.sh`) that performs two main actions:
+    1.  It creates a full logical backup of the **PostgreSQL Data Warehouse** using `pg_dumpall`.
+    2.  It copies the entire `/user` directory from the **HDFS Data Lake**.
+-   All backups are timestamped and stored in the local `./backups` directory, which is excluded from Git version control via `.gitignore`.
+
+### Performance Analysis
+A performance analysis of the main ETL job (`LoadDWH`) was conducted using the Spark UI to identify potential bottlenecks.
+-   **Methodology:** The "Stages" tab in the Spark UI was used to review the duration and data shuffling metrics for each step of the Spark job.
+-   **Key Observation:** The longest-running stages are those involving joins and aggregations on the `fct_sales` table, which is expected. A potential future optimization could be to partition the Hive tables by date to reduce the amount of data scanned during the daily load.
+
 ## Architecture
 
 ![Architecture Diagram](docs/images/architecture_diagram.png)

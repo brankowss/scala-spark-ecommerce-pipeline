@@ -1,0 +1,30 @@
+// Jenkinsfile-backup
+pipeline {
+    agent any
+    triggers {
+        // Schedule to run every Sunday at 2 AM
+        cron('0 2 * * 0')
+    }
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Run Backup Scripts') {
+            steps {
+                sh 'chmod +x scripts/run_backup.sh'
+                sh './scripts/run_backup.sh'
+            }
+        }
+    }
+    post {
+        failure {
+            withCredentials([string(credentialsId: 'NOTIFICATION_EMAIL', variable: 'NOTIFICATION_EMAIL')]) {
+                mail to: RECIPIENT_EMAIL,
+                     subject: "FAILURE: Jenkins Pipeline - Backup Job",
+                     body: "The weekly backup job failed. Please check the logs: ${env.BUILD_URL}"
+            }
+        }
+    }
+}

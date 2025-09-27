@@ -174,7 +174,13 @@ This is a separate, more frequent job that only ingests new transaction data, as
         -   **Branch Specifier**: `*/main`.
         -   **Script Path**: `Jenkinsfile-transactions-only` (This is the crucial step).
     -   Click **Save**.  
-    
+
+### 5.6. Create the Weekly Backup Job
+1.  Create a **New Item** named **`backup-pipeline`**.
+2.  In **Build Triggers**, set the **Schedule** to `0 2 * * 0` (every Sunday at 2 AM).
+3.  In the **Pipeline** section, configure it to use `Pipeline script from SCM` but set the **Script Path** to `Jenkinsfile-backup`.
+4.  Click **Save**.    
+
 ## Step 6: Set Up Metabase & Create Dashboards
 
 ### 6.1. Initial Setup

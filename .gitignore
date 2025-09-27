@@ -11,6 +11,7 @@
 # Runtime data and log folders
 /hadoop_data/
 /postgres_data_p2/
+/backups/
 
 # Log files
 *.log
