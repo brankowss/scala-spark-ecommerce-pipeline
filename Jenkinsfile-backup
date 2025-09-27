@@ -22,6 +22,11 @@ pipeline {
         }
     }
     post {
+        // This block runs only if the pipeline is successful.
+        success {
+            echo "Archiving backup files as artifacts..."
+            archiveArtifacts artifacts: 'backups/**', followSymlinks: false
+        }
         failure {
             withCredentials([string(credentialsId: 'NOTIFICATION_EMAIL', variable: 'NOTIFICATION_EMAIL')]) {
                 mail to: NOTIFICATION_EMAIL,
