@@ -17,17 +17,26 @@ This is a crucial step that prepares all necessary directories, dependencies, an
 These folders are required by the pipeline for data generation and reporting, and they need to be writable by the Docker containers.
 
 ```bash
-mkdir -p generated_data reports jars
+mkdir -p generated_data reports jars db_init
 sudo chmod -R 777 generated_data reports 
 ```
 
-### 2.2. Download the PostgreSQL JDBC Driver
+### 2.2. Create the Metabase Initialization Script
+This SQL script will run automatically the first time PostgreSQL starts, creating a dedicated database for Metabase to store its own application data (users, dashboards, etc.).
+
+Create a new file at **`db_init/init.sql`** and add the following single line of code to it:
+
+```sql
+CREATE DATABASE metabase_app_db;
+```
+
+### 2.3. Download the PostgreSQL JDBC Driver
 The Spark job needs this driver to connect to the PostgreSQL data warehouse.
 ```bash
 wget -P ./jars [https://jdbc.postgresql.org/download/postgresql-42.7.3.jar](https://jdbc.postgresql.org/download/postgresql-42.7.3.jar)
 ```
 
-### 2.3. Configure Database Credentials
+### 2.4. Configure Database Credentials
 
 This step sets up the username and password for your PostgreSQL database.
 
@@ -42,11 +51,19 @@ This step sets up the username and password for your PostgreSQL database.
     POSTGRES_USER=your_usersname
     POSTGRES_PASSWORD=your_secure_password
     POSTGRES_DB=ecommerce_dwh
+
+     # --- Metabase Application DB Configuration ---
+    MB_DB_TYPE=postgres
+    MB_DB_DBNAME=metabase_app_db
+    MB_DB_PORT=5432
+    MB_DB_USER= # Should match POSTGRES_USER
+    MB_DB_PASS= # Should match POSTGRES_PASSWORD
+    MB_DB_HOST=postgres-warehouse
     ```
 
 3.  **Edit the values** according to your preference.
-    -   **`POSTGRES_USER`**: Your username.
-    -   **`POSTGRES_PASSWORD`**: Your password.
+    -   **`POSTGRES_USER` / `MB_DB_USER`**: Your username.
+    -   **`POSTGRES_PASSWORD` / `MB_DB_PASS`**: Your password.
     -   **`POSTGRES_DB`**: You can leave this as `ecommerce_dwh`.
 
 4.  **Save the file** after making your changes. These variables will be automatically used by Docker Compose to configure your database.
@@ -95,6 +112,9 @@ This section covers the complete setup of Jenkins, from initial configuration to
 4.  **Create Admin User:** Create your first admin user account.
 
 ### 5.2. Create Credentials
+
+> **Note on Email Configuration:** These instructions are specifically for using a **Gmail** account as the sender. This requires generating a **16-character Google App Password**. If you use a different email provider (like Outlook, Yahoo, etc.), you will need to find their specific SMTP server settings and authentication method.
+
 For the pipeline to send emails securely, we need to store your email details in the Jenkins Credentials store.
 
 1.  From the Jenkins dashboard, navigate to **Manage Jenkins > Credentials**.

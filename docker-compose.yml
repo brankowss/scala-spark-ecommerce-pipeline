@@ -129,6 +129,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres_data_p2:/var/lib/postgresql/data  # Persists the final DWH tables
+      - ./db_init:/docker-entrypoint-initdb.d
     networks:
       - data-pipeline-network
       
@@ -139,8 +140,13 @@ services:
       - "3000:3000"
     depends_on:
       - postgres-warehouse
-    volumes: 
-      - metabase_data_p2:/metabase-data
+    environment:
+      MB_DB_TYPE: ${MB_DB_TYPE}
+      MB_DB_DBNAME: ${MB_DB_DBNAME}
+      MB_DB_PORT: ${MB_DB_PORT}
+      MB_DB_USER: ${MB_DB_USER}
+      MB_DB_PASS: ${MB_DB_PASS}
+      MB_DB_HOST: ${MB_DB_HOST}
     networks:
       - data-pipeline-network
 
@@ -174,7 +180,6 @@ volumes:
   hadoop_datanode_data:
   hive_metastore_db_data:
   postgres_data_p2:
-  metabase_data_p2:
   jenkins_data:
 
 # A single bridge network for all services to communicate
