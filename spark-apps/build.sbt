@@ -2,16 +2,17 @@
 name := "ecommerce-pipeline-spark-jobs"
 version := "1.0"
 
-// Define the Scala version. This must match the version Spark was compiled with.
+// Define the Scala version.
 scalaVersion := "2.12.15"
 
-// Define library dependencies needed for the project to compile.
+// Define library dependencies.
 libraryDependencies ++= Seq(
   // Spark Core, SQL, and Hive libraries.
-  // The "% 'provided'" part is crucial: it tells sbt NOT to include these JARs
-  // in our final package, because they already exist on the Spark cluster.
-  // This keeps our final JAR file small and clean.
   "org.apache.spark" %% "spark-core" % "3.5.0" % "provided",
   "org.apache.spark" %% "spark-sql" % "3.5.0" % "provided",
-  "org.apache.spark" %% "spark-hive" % "3.5.0" % "provided"
+  "org.apache.spark" %% "spark-hive" % "3.5.0" % "provided",
+  
+  // This is the Spark-Kafka connector library.
+  // It is needed for the StreamProcessor job to read data from Kafka topics.
+  "org.apache.spark" %% "spark-sql-kafka-0-10" % "3.5.0" % "provided"
 )

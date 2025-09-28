@@ -47,19 +47,25 @@ This step sets up the username and password for your PostgreSQL database.
 
 2.  **Open the new `.env` file** in your code editor (e.g., VS Code). You will see the following content:
     ```env
-    # PostgreSQL Credentials
+    # 1. PostgreSQL Data Warehouse Credentials
     POSTGRES_USER=your_usersname
     POSTGRES_PASSWORD=your_secure_password
     POSTGRES_DB=ecommerce_dwh
 
-     # --- Metabase Application DB Configuration ---
+    # 2. Metabase Application Database Credentials
     MB_DB_TYPE=postgres
     MB_DB_DBNAME=metabase_app_db
     MB_DB_PORT=5432
     MB_DB_USER= # Should match POSTGRES_USER
     MB_DB_PASS= # Should match POSTGRES_PASSWORD
     MB_DB_HOST=postgres-warehouse
+
+    # 3. Twitter API Credentials (for Bonus Task)
+    # This is required only for the bonus streaming pipeline (EP-12).
+    TWITTER_BEARER_TOKEN=your_twitter_bearer_token_here
     ```
+
+    # Note: To get a TWITTER_BEARER_TOKEN, you must have a Twitter Developer account and create an App within a Project on the Developer Portal.
 
 3.  **Edit the values** according to your preference.
     -   **`POSTGRES_USER` / `MB_DB_USER`**: Your username.
@@ -288,3 +294,55 @@ Create the following four questions to answer the business requirements from the
 4.  Add all four questions you created.
 5.  Drag and resize the charts to create a nice layout.
 6.  Click **Save**.   
+
+## Step 7 (Bonus): Running the Live Streaming Pipeline
+
+### 1. Create the `streaming-pipeline-control` Job in Jenkins
+
+This job acts as a "remote control" to start and stop your streaming pipeline.
+
+1.  On the Jenkins dashboard, click **New Item**.
+2.  Enter the name **`streaming-pipeline-control`**, select **Pipeline**, and click **OK**.
+3.  In the job configuration page, go to the **Pipeline** section.
+4.  Set **Definition** to `Pipeline script from SCM`.
+5.  Set **SCM** to `Git`.
+6.  Enter your GitHub repository URL.
+7.  Ensure the **Branch Specifier** is `*/main`.
+8.  Set the **Script Path** to `Jenkinsfile-streaming-control`.
+9.  Click **Save**.
+
+### 2. How to Use the `START`/`STOP` Controls
+
+Now that the job is created, you can manage your streaming pipeline directly from the Jenkins UI.
+
+1.  **To Start the Pipeline:**
+    -   Navigate to the `streaming-pipeline-control` job.
+    -   Click on **`Build with Parameters`** in the left-hand menu.
+    -   From the `ACTION` dropdown menu, select **`START`**.
+    -   Click the **`Build`** button.
+    -   This will start the `twitter-producer` and the `StreamProcessor` Spark job.
+
+2.  **To Stop the Pipeline:**
+    -   Navigate to the `streaming-pipeline-control` job.
+    -   Click on **`Build with Parameters`** again.
+    -   From the `ACTION` dropdown, select **`STOP`**.
+    -   Click the **`Build`**. This will stop all streaming components.
+
+### 3. Create the Metabase "Question" (Chart)
+
+After you have run the `START` action and let the pipeline run for a few minutes to collect and process data, you can visualize the results.
+
+1.  In Metabase, click **`+ New`** > **`Question`**.
+2.  Select your database (e.g., `E-commerce DWH`) and the new **`trending_products`** table.
+3.  You will see a table with the trending products. Click the **`Visualization`** button at the bottom and select the **`Bar`** chart icon.
+4.  Click **`Save`**. Name the question `Live Twitter Trends` and save it.
+
+### 4. Create the Final Dashboard
+
+1.  On the main Metabase page, click **`+ New`** > **`Dashboard`**.
+2.  Name your new dashboard **`Bonus - Live Trends`**.
+3.  Click the **`+`** icon to add your saved `Live Twitter Trends` question to the dashboard.
+4.  Resize the chart as needed.
+5.  **Set up Auto-Refresh:** To make the dashboard "live," click the **Clock icon (🕒)** in the top-right corner of the dashboard and set it to refresh **every 5 minutes**.
+6.  Click **`Save`** to save the dashboard.
+

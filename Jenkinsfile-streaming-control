@@ -1,0 +1,50 @@
+// Jenkinsfile-streaming-control
+// This pipeline acts as a remote control for the streaming application.
+// It uses a parameter to either START or STOP the necessary services.
+
+pipeline {
+    agent any
+
+    // This adds a dropdown menu to the Jenkins job UI.
+    parameters {
+        choice(name: 'ACTION', choices: ['START', 'STOP'], description: 'Choose whether to start or stop the streaming pipeline')
+    }
+
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Execute Streaming Action') {
+            steps {
+                script {
+                    if (params.ACTION == 'START') {
+                        echo "--- Starting Streaming Pipeline ---"
+
+                        echo "Starting Twitter Producer container..."
+                        sh 'docker compose up -d --build twitter-producer'
+
+                        echo "Submitting Spark Streaming job..."
+                        // We run this in the background (&) so the Jenkins job can finish.
+                        sh 'docker compose exec spark-master spark-submit --class StreamProcessor --master spark://spark-master:7077 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 --jars /opt/bitnami/spark/jars/postgresql-42.7.3.jar /opt/bitnami/spark/apps/target/scala-2.12/ecommerce-pipeline-spark-jobs_2.12-1.0.jar &'
+
+                        echo "Streaming pipeline started. Check Spark UI and container logs to monitor."
+
+                    } else if (params.ACTION == 'STOP') {
+                        echo "--- Stopping Streaming Pipeline ---"
+
+                        echo "Stopping Twitter Producer container..."
+                        sh 'docker compose stop twitter-producer'
+
+                        echo "Finding and stopping Spark Streaming job..."
+                        // This command finds the StreamProcessor job by name and kills it.
+                        sh "docker compose exec spark-master bash -c 'pkill -f StreamProcessor || echo No StreamProcessor job found to kill.'"
+
+                        echo "Streaming pipeline stopped."
+                    }
+                }
+            }
+        }
+    }
+}
