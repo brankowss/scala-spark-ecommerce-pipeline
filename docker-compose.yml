@@ -117,6 +117,34 @@ services:
     networks:
       - data-pipeline-network
   
+  # --- Kafka: The Real-time Messaging System ---
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1
+    container_name: zookeeper
+    networks:
+      - data-pipeline-network
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.0.1
+    container_name: kafka
+    networks:
+      - data-pipeline-network
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
    # --- Data Warehouse & BI Layer ---
   postgres-warehouse:
     image: postgres:13-alpine
@@ -173,6 +201,25 @@ services:
       # - .:/var/jenkins_home/workspace/pipeline-test
     networks:
       - data-pipeline-network
+
+  # --- Twitter Producer: The Real-time Data Source ---
+  # This service is a custom Python application that connects to the Twitter API,
+  # collects relevant tweets in real-time, and sends them to a Kafka topic.
+  twitter-producer:
+    # Tells Docker Compose to build a custom image from the Dockerfile
+    # located in the ./twitter-producer directory.
+    build: ./twitter-producer
+    container_name: twitter-producer
+    networks:
+      - data-pipeline-network
+    # Ensures that the Kafka container is started and healthy before this producer
+    # attempts to connect to it, preventing connection errors on startup.
+    depends_on:
+      - kafka
+    # Securely passes the Twitter Bearer Token from the .env file into the
+    # container as an environment variable for the Python script to use.
+    environment:
+      TWITTER_BEARER_TOKEN: ${TWITTER_BEARER_TOKEN}
 
 # Named volumes for persistent storage
 volumes:

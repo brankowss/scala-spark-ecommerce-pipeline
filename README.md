@@ -34,6 +34,14 @@ A performance analysis of the main ETL job (`LoadDWH`) was conducted using the S
 -   **Methodology:** The "Stages" tab in the Spark UI was used to review the duration and data shuffling metrics for each step of the Spark job.
 -   **Key Observation:** The longest-running stages are those involving joins and aggregations on the `fct_sales` table, which is expected. A potential future optimization could be to partition the Hive tables by date to reduce the amount of data scanned during the daily load.
 
+## Bonus Task (EP-12): Twitter Trend Analysis
+
+As a bonus, a complete, parallel mini-batch pipeline was built to analyze near real-time data from Twitter.
+
+-   **Architecture:** The pipeline uses a custom Python producer (`twitter-producer`) that connects to the **Twitter API v2 "Recent Search" endpoint**. It fetches a batch of recent tweets matching product keywords and sends them as messages to an **Apache Kafka** topic.
+-   **Processing:** A dedicated Spark job (`KafkaBatchProcessor.scala`) consumes the batch of messages from Kafka, processes the tweets, and writes the top trending products to a new `trending_products` table in PostgreSQL.
+-   **Visualization:** A dashboard in Metabase (`Bonus - Live Trends`) visualizes the results from the `trending_products` table.
+
 ## Architecture
 
 ![Architecture Diagram](docs/images/architecture_diagram.png)
@@ -43,6 +51,7 @@ A performance analysis of the main ETL job (`LoadDWH`) was conducted using the S
 -   **Containerization:** Docker, Docker Compose
 -   **Orchestration:** Jenkins
 -   **Data Lake:** Hadoop Distributed File System (HDFS)
+-   **Messaging/Streaming:** Apache Kafka
 -   **Staging / Metastore:** Apache Hive
 -   **Data Processing:** Apache Spark (using Scala)
 -   **Data Warehouse:** PostgreSQL
@@ -103,13 +112,13 @@ This dual system ensures both technical stability and proactive business monitor
 
 ## Final Dashboard & Screenshots
 
-### 1. E-commerce Sales Overview Dashboard
-
-This dashboard, built in Metabase, provides a high-level overview of business performance, answering key questions from the project's Yellow Phase.
-
+### 1. E-commerce Sales Overview Dashboard (Batch)
 ![Sales Overview Dashboard](docs/images/metabase_dashboard.png)
 
-### 2. Technical Components
+### 2. Live Twitter Trends Dashboard (Streaming)
+![Twitter Trends Dashboard](docs/images/twitter_trends_dashboard.png)
+
+### 3. Technical Components                     
 
 | Jenkins Pipeline View | Spark UI (Applications) |
 | :---: | :---: |
@@ -121,7 +130,7 @@ This dashboard, built in Metabase, provides a high-level overview of business pe
 | ![HDFS Data Lake](docs/images/hdfs_data_lake.png) | ![Hive Bronze Tables](docs/images/hive_bronze_tables.png) |
 | Terminal output showing raw files in HDFS. | The Hive Beeline client showing the structured bronze tables. |
 
-### 3. Project Management & Alerting
+### 4. Project Management & Alerting
 
 | Jira Project Board | SUCCESS Email | ALERT Email |
 | :---: | :---: | :---: |
