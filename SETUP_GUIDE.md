@@ -21,22 +21,13 @@ mkdir -p generated_data reports jars db_init
 sudo chmod -R 777 generated_data reports 
 ```
 
-### 2.2. Create the Metabase Initialization Script
-This SQL script will run automatically the first time PostgreSQL starts, creating a dedicated database for Metabase to store its own application data (users, dashboards, etc.).
-
-Create a new file at **`db_init/init.sql`** and add the following single line of code to it:
-
-```sql
-CREATE DATABASE metabase_app_db;
-```
-
-### 2.3. Download the PostgreSQL JDBC Driver
+### 2.2. Download the PostgreSQL JDBC Driver
 The Spark job needs this driver to connect to the PostgreSQL data warehouse.
 ```bash
-wget -P ./jars [https://jdbc.postgresql.org/download/postgresql-42.7.3.jar](https://jdbc.postgresql.org/download/postgresql-42.7.3.jar)
+wget -P ./jars wget -P ./jars https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
 ```
 
-### 2.4. Configure Database Credentials
+### 2.3. Configure Database Credentials
 
 This step sets up the username and password for your PostgreSQL database.
 
