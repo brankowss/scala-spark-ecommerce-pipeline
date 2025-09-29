@@ -5,7 +5,7 @@ This guide provides step-by-step instructions to set up and run the E-commerce D
 ## Step 1: Clone the Repository
 
 ```bash
-git clone [https://github.com/brankowss/scala-spark-ecommerce-pipeline.git](https://github.com/brankowss/scala-spark-ecommerce-pipeline.git)
+git clone https://github.com/brankowss/scala-spark-ecommerce-pipeline.git
 cd scala-spark-ecommerce-pipeline
 ```
 
