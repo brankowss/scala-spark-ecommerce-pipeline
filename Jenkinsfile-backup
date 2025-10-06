@@ -28,9 +28,10 @@ pipeline {
             archiveArtifacts artifacts: 'backups/**', followSymlinks: false
         }
         failure {
-            withCredentials([string(credentialsId: 'NOTIFICATION_EMAIL', variable: 'NOTIFICATION_EMAIL')]) {
-                mail to: NOTIFICATION_EMAIL,
-                     subject: "FAILURE: Jenkins Pipeline - Backup Job",
+            script {
+                echo "Sending failure notification email..."
+                mail to: env.NOTIFICATION_EMAIL,
+                     subject: "❌ FAILURE: Jenkins Pipeline - Backup Job",
                      body: "The weekly backup job failed. Please check the logs: ${env.BUILD_URL}"
             }
         }

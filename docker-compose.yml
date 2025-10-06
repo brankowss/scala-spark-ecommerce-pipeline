@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # --- HDFS Cluster: The Data Lake ---
   # HDFS serves as the primary storage for raw and staged data.
@@ -75,36 +77,41 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.spark
-    image: my-scala-spark-image:latest
     container_name: spark-master
-    env_file:
-      - ./hadoop-hive.env
+    command: >
+      bash -c "/opt/spark/sbin/start-master.sh && tail -f /dev/null"
+    ports:
+      - "8081:8080"
+      - "7077:7077"
+      - "4040:4040"
+    volumes:
+      - ./spark-apps:/opt/spark/apps
+      - ./jars:/opt/spark/jars-custom
+      - ./reports:/opt/spark/reports
+    networks:
+      - data-pipeline-network
     environment:
       - SPARK_MODE=master
       # Pass PostgreSQL credentials to the Spark driver
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
-    ports:
-      - "8081:8080"  # Spark Master Web UI
-      - "7077:7077"  # Spark Master RPC Port
-      - "4040:4040"  # Spark Application Web UI 
-    volumes: 
-      - ./spark-apps:/opt/bitnami/spark/apps
-      - ./reports:/opt/bitnami/spark/reports
-    networks:
-      - data-pipeline-network
-
+      
   spark-worker:
     build:
       context: .
       dockerfile: Dockerfile.spark
-    image: my-scala-spark-image:latest
     container_name: spark-worker
     depends_on:
       - spark-master
-    env_file:
-      - ./hadoop-hive.env
+    command: >
+      bash -c "/opt/spark/sbin/start-worker.sh spark://spark-master:7077 && tail -f /dev/null"
+    volumes:
+      - ./spark-apps:/opt/spark/apps
+      - ./jars:/opt/spark/jars-custom
+      - ./reports:/opt/spark/reports
+    networks:
+      - data-pipeline-network
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
@@ -112,11 +119,52 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
+
+   # --- Data Warehouse ---
+  postgres-warehouse:
+    image: postgres:13-alpine
+    container_name: postgres-warehouse
+    ports:
+      - "5435:5432"
     volumes:
-      - ./spark-apps:/opt/bitnami/spark/apps
+      - postgres_data_p2:/var/lib/postgresql/data
+      - ./db_init:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     networks:
       - data-pipeline-network
-  
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Orchestration ---
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins
+    container_name: jenkins
+    user: "root"
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Only for testing purpose.
+      - .:/var/jenkins_home/workspace/pipeline-test
+    networks:
+      - data-pipeline-network
+    depends_on:
+      - spark-master
+    environment:
+      - NOTIFICATION_EMAIL=${NOTIFICATION_EMAIL}
+      - JENKINS_SENDER_EMAIL=${JENKINS_SENDER_EMAIL}
+      - JENKINS_EMAIL_APP_PASSWORD=${JENKINS_EMAIL_APP_PASSWORD}
+      
   # --- Kafka: The Real-time Messaging System ---
   zookeeper:
     image: confluentinc/cp-zookeeper:7.0.1
@@ -139,35 +187,35 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
 
-   # --- Data Warehouse & BI Layer ---
-  postgres-warehouse:
-    image: postgres:13-alpine
-    container_name: postgres-warehouse
-    ports:
-      - "5433:5432"
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    volumes:
-      - postgres_data_p2:/var/lib/postgresql/data  # Persists the final DWH tables
-      - ./db_init:/docker-entrypoint-initdb.d
+  # --- Twitter Producer: The Real-time Data Source ---
+  twitter-producer:
+    build: ./twitter-producer
+    container_name: twitter-producer
+    command: tail -f /dev/null
     networks:
       - data-pipeline-network
-      
+    depends_on:
+      - kafka
+    environment:
+      TWITTER_BEARER_TOKEN: ${TWITTER_BEARER_TOKEN}
+
+# --- BI Layer ---
   metabase:
     image: metabase/metabase:latest
     container_name: metabase
+    restart: unless-stopped
     ports:
       - "3000:3000"
+    networks:
+      - data-pipeline-network
     depends_on:
-      - postgres-warehouse
+      postgres-warehouse:
+        condition: service_healthy
     environment:
       MB_DB_TYPE: ${MB_DB_TYPE}
       MB_DB_DBNAME: ${MB_DB_DBNAME}
@@ -175,51 +223,11 @@ services:
       MB_DB_USER: ${MB_DB_USER}
       MB_DB_PASS: ${MB_DB_PASS}
       MB_DB_HOST: ${MB_DB_HOST}
-    networks:
-      - data-pipeline-network
 
-  # --- Orchestration ---
-  jenkins:
-    build:
-      context: .
-      dockerfile: Dockerfile.jenkins # Build from our new Dockerfile
-    container_name: jenkins
-    depends_on:
-      - spark-master
-      - hive-server
-      - namenode
-      - datanode
-    ports:
-      - "8080:8080"  # Jenkins Web UI
-      - "50000:50000"  # Port for Jenkins agents
-    volumes:
-      - jenkins_data:/var/jenkins_home  # Persists Jenkins configuration and jobs
-      # Mount the Docker socket to allow Jenkins to run Docker commands
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./generated_data:/var/jenkins_home/workspace/ecommerce-daily-pipeline/generated_data 
-      # THIS IS THE CRUCIAL LINE FOR TESTING:
-      # - .:/var/jenkins_home/workspace/pipeline-test
-    networks:
-      - data-pipeline-network
-
-  # --- Twitter Producer: The Real-time Data Source ---
-  # This service is a custom Python application that connects to the Twitter API,
-  # collects relevant tweets in real-time, and sends them to a Kafka topic.
-  twitter-producer:
-    # Tells Docker Compose to build a custom image from the Dockerfile
-    # located in the ./twitter-producer directory.
-    build: ./twitter-producer
-    container_name: twitter-producer
-    networks:
-      - data-pipeline-network
-    # Ensures that the Kafka container is started and healthy before this producer
-    # attempts to connect to it, preventing connection errors on startup.
-    depends_on:
-      - kafka
-    # Securely passes the Twitter Bearer Token from the .env file into the
-    # container as an environment variable for the Python script to use.
-    environment:
-      TWITTER_BEARER_TOKEN: ${TWITTER_BEARER_TOKEN}
+# A single bridge network for all services to communicate
+networks:
+  data-pipeline-network:
+    driver: bridge
 
 # Named volumes for persistent storage
 volumes:
@@ -229,7 +237,3 @@ volumes:
   postgres_data_p2:
   jenkins_data:
 
-# A single bridge network for all services to communicate
-networks:
-  data-pipeline-network:
-    driver: bridge

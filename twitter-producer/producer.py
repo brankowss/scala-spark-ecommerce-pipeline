@@ -1,75 +1,82 @@
-# twitter-producer/producer.py
-
-# Import necessary libraries
-import tweepy  # The official Python library for accessing the Twitter API v2
-import json  # Used for parsing API responses
-from kafka import KafkaProducer  # The client for sending messages to Kafka topics
-import time  # Used to add delays to the script
-import os  # Used to access environment variables for security
+import tweepy
+import json
+from kafka import KafkaProducer
+import time
+import os
+import random
 
 # --- Twitter API Configuration ---
-# Securely retrieve the Bearer Token from an environment variable.
 bearer_token = os.environ.get("TWITTER_BEARER_TOKEN")
 if not bearer_token:
     raise ValueError("TWITTER_BEARER_TOKEN environment variable not set!")
 
 # --- Kafka Configuration ---
-# Define the name of the Kafka topic where tweets will be sent.
 KAFKA_TOPIC = 'twitter_trends'
-# Define the address of the Kafka broker. 'kafka:29092' is the internal Docker network address.
 KAFKA_SERVER = 'kafka:29092'
 
 # --- Product Keywords for Search Query ---
-# This list contains the keywords that will be used to build a search query.
 product_keywords = ["cake", "tins", "pantry", "glass star", "t-light", "union jack", "hand warmer", "bird ornament", "playhouse", "mug cosy"]
 
-# This block runs when the script is executed directly.
-if __name__ == "__main__":
-    print("Starting Twitter Historical Search Producer...")
-    
-    # Initialize the main Tweepy client with your Bearer Token.
-    # This client is used for most v2 API endpoints, including search.
+def fetch_initial_tweets():
+    """Connects to Twitter API v2 once to fetch a batch of recent tweets."""
     try:
         client = tweepy.Client(bearer_token)
-        print("Connected to Twitter API.")
-    except Exception as e:
-        print(f"Error connecting to Twitter API: {e}")
-        exit()
-
-    # Initialize the Kafka producer, connecting to the Kafka server.
-    producer = KafkaProducer(bootstrap_servers=[KAFKA_SERVER])
-    print("Connected to Kafka.")
-
-    # Build the search query string for the Twitter API.
-    # " OR " means we want tweets containing ANY of the keywords.
-    # "-is:retweet lang:en" excludes retweets and ensures English language.
-    query = " OR ".join(product_keywords) + " -is:retweet lang:en"
-    
-    print(f"Searching for the last 100 tweets with query: {query}")
-
-    try:
-        # This is the main API call. It uses the search_recent_tweets method to
-        # get historical tweets from the last 7 days.
-        # max_results is set to 100 to be safe with API limits.
+        print("Connected to Twitter API to fetch initial tweets.")
+        query = " OR ".join(product_keywords) + " -is:retweet lang:en"
         response = client.search_recent_tweets(query=query, max_results=100)
-
-        # The response object can be empty if no tweets are found.
+        
         if response.data:
-            print(f"Found {len(response.data)} tweets. Sending to Kafka...")
-            # Loop through each tweet found in the response.
-            for tweet in response.data:
-                tweet_text = tweet.text
-                print(f"--- Sending Tweet to Kafka: {tweet_text[:50]}...")
-                # Send each tweet's text to our Kafka topic.
-                producer.send(KAFKA_TOPIC, value=tweet_text.encode('utf-8'))
-                # Add a 60-second pause to be extra safe with API limits.
-                time.sleep(60)
+            print(f"Successfully fetched {len(response.data)} tweets to use for the stream.")
+            return [tweet.text for tweet in response.data]
         else:
-            print("No tweets found for the given keywords in the last 7 days.")
-
+            print("No tweets found. Using fallback sample data.")
+            return ["Sample tweet about a nice cake tins.", "This union jack hand warmer is great!"]
+            
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"Could not connect to Twitter API: {e}. Using fallback sample data.")
+        return ["Sample tweet about a nice cake tins.", "This union jack hand warmer is great!"]
+
+if __name__ == "__main__":
+    print("Starting Simulated Twitter Stream Producer...")
+
+    # 1. Fetch a batch of real tweets ONCE to use as our source material.
+    tweets_buffer = fetch_initial_tweets()
+
+    # 2. Connect to Kafka with a retry mechanism.
+    producer = None
+    retries = 5
+    while retries > 0:
+        try:
+            producer = KafkaProducer(bootstrap_servers=[KAFKA_SERVER])
+            print("Successfully connected to Kafka.")
+            break
+        except Exception as e:
+            print(f"Failed to connect to Kafka: {e}. Retrying in 5 seconds... ({retries - 1} retries left)")
+            retries -= 1
+            time.sleep(5)
+
+    if not producer:
+        print("Could not connect to Kafka after several retries. Exiting.")
+        exit(1)
+
+    print(f"Starting to send simulated stream to topic '{KAFKA_TOPIC}'...")
+
+    # 3. Start an infinite loop to simulate a live stream using the fetched tweets.
+    try:
+        index = 0
+        while True:
+            tweet_text = tweets_buffer[index % len(tweets_buffer)]
+            
+            print(f"--- Sending Tweet to Kafka: {tweet_text[:50]}...")
+            producer.send(KAFKA_TOPIC, value=tweet_text.encode('utf-8'))
+            
+            index += 1
+            time.sleep(random.randint(2, 5))
+
+    except KeyboardInterrupt:
+        print("\nStopping producer...")
     finally:
-        # This ensures the producer connection is closed cleanly when the script finishes.
-        producer.close()
-        print("Finished sending tweets. Kafka producer closed.")
+        if producer:
+            producer.close()
+        print("Kafka producer closed.")
+

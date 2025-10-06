@@ -67,7 +67,7 @@ object KafkaBatchProcessor {
     // 9. Configure the PostgreSQL connection properties.
     // It reads credentials from environment variables.
     println("Writing results to PostgreSQL...")
-    val pgUser = sys.env.getOrElse("POSTG-RES_USER", "branko")
+    val pgUser = sys.env.getOrElse("POSTGRES_USER", "postgres")
     val pgPassword = sys.env.getOrElse("POSTGRES_PASSWORD", "your_secure_password")
     val pgDb = sys.env.getOrElse("POSTGRES_DB", "ecommerce_dwh")
     val pgJdbcUrl = "jdbc:postgresql://postgres-warehouse:5432/" + pgDb

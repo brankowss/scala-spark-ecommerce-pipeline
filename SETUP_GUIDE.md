@@ -54,16 +54,17 @@ This step sets up the username and password for your PostgreSQL database.
     # 3. Twitter API Credentials (for Bonus Task)
     # This is required only for the bonus streaming pipeline (EP-12).
     TWITTER_BEARER_TOKEN=your_twitter_bearer_token_here
+
+    # 4. These are used by Jenkins to send pipeline status and alert emails.
+    NOTIFICATION_EMAIL=your_email@example.com
+    JENKINS_SENDER_EMAIL=your_sender_gmail@gmail.com
+    JENKINS_EMAIL_APP_PASSWORD=your_16_character_app_password
     ```
+    ## Note (Email): To get a JENKINS_EMAIL_APP_PASSWORD, you must enable 2-Factor Authentication on your Google Account and generate a 16-character "App Password" for Jenkins.
 
-    # Note: To get a TWITTER_BEARER_TOKEN, you must have a Twitter Developer account and create an App within a Project on the Developer Portal.
+    ## Note (Twitter): To get a TWITTER_BEARER_TOKEN, you must have a Twitter Developer account and create an App within a Project on the Developer Portal.
 
-3.  **Edit the values** according to your preference.
-    -   **`POSTGRES_USER` / `MB_DB_USER`**: Your username.
-    -   **`POSTGRES_PASSWORD` / `MB_DB_PASS`**: Your password.
-    -   **`POSTGRES_DB`**: You can leave this as `ecommerce_dwh`.
-
-4.  **Save the file** after making your changes. These variables will be automatically used by Docker Compose to configure your database.
+3.  **Save the file** after making your changes. 
 
 ## Step 3: Build and Start All Services
 
@@ -108,42 +109,7 @@ This section covers the complete setup of Jenkins, from initial configuration to
 3.  **Install Plugins:** Choose **Install suggested plugins**.
 4.  **Create Admin User:** Create your first admin user account.
 
-### 5.2. Create Credentials
-
-> **Note on Email Configuration:** These instructions are specifically for using a **Gmail** account as the sender. This requires generating a **16-character Google App Password**. If you use a different email provider (like Outlook, Yahoo, etc.), you will need to find their specific SMTP server settings and authentication method.
-
-For the pipeline to send emails securely, we need to store your email details in the Jenkins Credentials store.
-
-1.  From the Jenkins dashboard, navigate to **Manage Jenkins > Credentials**.
-2.  Under "Stores scoped to Jenkins," click on **(global)**.
-3.  Click **Add Credentials** in the left menu.
-
-Now, create the following three credentials, one by one.
-
-#### A. The Recipient Email (`NOTIFICATION_EMAIL`)
--   **Kind**: `Secret text`
--   **Secret**: Your email address where you want to receive notifications (e.g., `your.email@gmail.com`).
--   **ID**: `NOTIFICATION_EMAIL` (This must be exact).
--   **Description**: `Recipient email for all pipeline notifications.` (Optional)
--   Click **Create**.
-
-#### B. The Sender Email (`JENKINS_SENDER_EMAIL`)
--   Click **Add Credentials** again.
--   **Kind**: `Secret text`
--   **Secret**: The Gmail address that will be used to send emails (this can be the same as the recipient).
--   **ID**: `JENKINS_SENDER_EMAIL` (This must be exact).
--   **Description**: `Sender Gmail account for Jenkins.` (Optional)
--   Click **Create**.
-
-#### C. The Sender's App Password (`JENKINS_EMAIL_APP_PASSWORD`)
--   Click **Add Credentials** again.
--   **Kind**: `Secret text`
--   **Secret**: The **16-character Google App Password** you generated for Jenkins.
--   **ID**: `JENKINS_EMAIL_APP_PASSWORD` (This must be exact).
--   **Description**: `Google App Password for the sender email.` (Optional)
--   Click **Create**.
-
-### 5.3. Configure Jenkins System Email
+### 5.2. Configure Jenkins System Email
 Now, we'll configure Jenkins to use your Gmail account to send emails.
 
 1.  Navigate to **Manage Jenkins > System**.
@@ -158,7 +124,7 @@ Now, we'll configure Jenkins to use your Gmail account to send emails.
     -   **SMTP Port**: `465`
 4.  Click **Save**.
 
-### 5.4. Create the Main Daily Pipeline Job
+### 5.3. Create the Main Daily Pipeline Job
 This job will run your main `Jenkinsfile` once a day to perform the complete ETL process and update the dashboards.
 
 1.  On the Jenkins dashboard, click **New Item**.
@@ -175,7 +141,7 @@ This job will run your main `Jenkinsfile` once a day to perform the complete ETL
 5.  Click **Save**.
 6.  You can click **Build Now** to run it once manually and confirm everything works. 
 
-### 5.5. Create the 4-Hourly Transaction Ingestion Job
+### 5.4. Create the 4-Hourly Transaction Ingestion Job
 This is a separate, more frequent job that only ingests new transaction data, as required by the project. It will use a different, simpler `Jenkinsfile`.
 
 2.  **Create the Jenkins Job:**
@@ -192,7 +158,7 @@ This is a separate, more frequent job that only ingests new transaction data, as
         -   **Script Path**: `Jenkinsfile-transactions-only` (This is the crucial step).
     -   Click **Save**.  
 
-### 5.6. Create the Weekly Backup Job
+### 5.5. Create the Weekly Backup Job
 
 This is a separate job dedicated to system maintenance. It runs on a weekly schedule to create backups of the critical data stores.
 
@@ -286,38 +252,61 @@ Create the following four questions to answer the business requirements from the
 5.  Drag and resize the charts to create a nice layout.
 6.  Click **Save**.   
 
-## Step 7 (Bonus): Running the Live Streaming Pipeline
+## Step 7 (Bonus): Running the Streaming Pipeline (Manual Control)
 
-### 1. Create the `streaming-pipeline-control` Job in Jenkins
+This section describes how to manually start, monitor, and stop the bonus streaming pipeline. This process uses a Python script to simulate a live stream of tweet data, which is then processed by a Spark Streaming job.
 
-This job acts as a "remote control" to start and stop your streaming pipeline.
+### 7.1. Compile the Scala Code (One-time step)
 
-1.  On the Jenkins dashboard, click **New Item**.
-2.  Enter the name **`streaming-pipeline-control`**, select **Pipeline**, and click **OK**.
-3.  In the job configuration page, go to the **Pipeline** section.
-4.  Set **Definition** to `Pipeline script from SCM`.
-5.  Set **SCM** to `Git`.
-6.  Enter your GitHub repository URL.
-7.  Ensure the **Branch Specifier** is `*/main`.
-8.  Set the **Script Path** to `Jenkinsfile-streaming-control`.
-9.  Click **Save**.
+Before running the pipeline for the first time, you must compile the Scala application code. Run this command once in your terminal. You only need to repeat this step if you make changes to the `.scala` files.
 
-### 2. How to Use the `START`/`STOP` Controls
+```bash
+docker compose exec -u root spark-master bash -c "cd /opt/spark/apps/ && sbt clean package"
+```
 
-Now that the job is created, you can manage your streaming pipeline directly from the Jenkins UI.
+### 7.2. Start the Pipeline
 
-1.  **To Start the Pipeline:**
-    -   Navigate to the `streaming-pipeline-control` job.
-    -   Click on **`Build with Parameters`** in the left-hand menu.
-    -   From the `ACTION` dropdown menu, select **`START`**.
-    -   Click the **`Build`** button.
-    -   This will start the `twitter-producer` and the `StreamProcessor` Spark job.
+The pipeline consists of two components that you will start from your terminal.
+```bash
+docker compose exec -d twitter-producer python3 producer.py
+```
 
-2.  **To Stop the Pipeline:**
-    -   Navigate to the `streaming-pipeline-control` job.
-    -   Click on **`Build with Parameters`** again.
-    -   From the `ACTION` dropdown, select **`STOP`**.
-    -   Click the **`Build`**. This will stop all streaming components.
+### Start the Spark Streaming Job
+
+This command starts the Spark job that reads from Kafka, processes the data, and writes to PostgreSQL. This command will occupy your current terminal window and display live logs.
+
+```bash
+docker compose exec spark-master /opt/spark/bin/spark-submit \
+  --class StreamProcessor \
+  --master spark://spark-master:7077 \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+  --jars /opt/spark/jars-custom/postgresql-42.7.3.jar \
+  /opt/spark/apps/target/scala-2.12/ecommerce-pipeline-spark-jobs_2.12-1.0.jar
+```
+
+### 7.3. Monitor and Check Results
+
+While the Spark job is running, you can open new terminal windows to monitor the system:
+
+- **Check Spark UI**: Go to `http://localhost:8081`. You should see *Kafka Batch Processor* in the "Running Applications" table.
+
+- **"Spy" on Kafka Messages**: To see the data flowing into Kafka in real-time.
+
+```bash
+docker compose exec kafka kafka-console-consumer --bootstrap-server kafka:29092 --topic twitter_trends
+```
+
+### 7.4. Stop the Pipeline
+
+When you are finished, you need to stop both processes.
+
+- **Stop the Spark Job**: Go to the terminal where the `spark-submit` command is running and press `Ctrl + C`.
+
+- **Stop the Data Producer**: Run the following command to find and stop the Python script running inside the `twitter-producer` container.
+
+```bash
+docker compose exec twitter-producer bash -c 'kill $(ps -ef | grep "[p]roducer.py" | awk "{print \$2}")'
+```
 
 ### 3. Create the Metabase "Question" (Chart)
 

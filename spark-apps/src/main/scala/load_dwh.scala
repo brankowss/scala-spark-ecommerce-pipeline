@@ -100,7 +100,7 @@ object LoadDWH {
 
     // --- 3. Business Logic Alerting (EP-7) - Corrected Logic per Project Spec ---
     println("Starting anomaly detection for high-quantity orders...")
-    val outlierFilePath = "/opt/bitnami/spark/reports/outliers.txt"
+    val outlierFilePath = "/opt/spark/reports/outliers.txt"
 
     try {
       if (df_transactions.count() > 0) {

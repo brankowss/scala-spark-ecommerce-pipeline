@@ -81,7 +81,7 @@ def generate_transaction_logs():
                 # To reliably test the business alert, the following block of code was
                 # temporarily used to guarantee the creation of a high-quantity outlier.
                 # It has been commented out for the final production version.
-                #
+                
                 # if stock_code == "22752":
                 #     quantity = 9999
                 # else:

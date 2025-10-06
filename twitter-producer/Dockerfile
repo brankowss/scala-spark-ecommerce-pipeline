@@ -3,6 +3,10 @@
 # without the extra bloat of a full distribution, keeping the final image smaller.
 FROM python:3.9-slim
 
+# Install the 'procps' package, which contains the 'ps' and 'kill' commands.
+# This makes our container more robust for process management.
+RUN apt-get update && apt-get install -y procps && rm -rf /var/lib/apt/lists/*
+
 # Set the working directory inside the container to /app.
 # All subsequent commands (COPY, RUN, CMD) will be executed from this path.
 WORKDIR /app
@@ -17,8 +21,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the main application script into the container.
-COPY producer.py .
+COPY . .
 
-# Specify the command to run when the container starts.
-# This will execute the command 'python producer.py' inside the container.
-CMD ["python", "producer.py"]
+# This entrypoint will keep the container running indefinitely,
+# but it will NOT automatically start the producer.py script. This gives us manual control.
+ENTRYPOINT ["tail", "-f", "/dev/null"]
