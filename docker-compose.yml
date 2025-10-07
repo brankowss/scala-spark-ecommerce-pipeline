@@ -155,7 +155,7 @@ services:
       - jenkins_data:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
       # Only for testing purpose.
-      - .:/var/jenkins_home/workspace/pipeline-test
+      # - .:/var/jenkins_home/workspace/pipeline-test
     networks:
       - data-pipeline-network
     depends_on:
