@@ -276,12 +276,7 @@ docker compose exec -d twitter-producer python3 producer.py
 This command starts the Spark job that reads from Kafka, processes the data, and writes to PostgreSQL. This command will occupy your current terminal window and display live logs.
 
 ```bash
-docker compose exec spark-master /opt/spark/bin/spark-submit \
-  --class StreamProcessor \
-  --master spark://spark-master:7077 \
-  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
-  --jars /opt/spark/jars-custom/postgresql-42.7.3.jar \
-  /opt/spark/apps/target/scala-2.12/ecommerce-pipeline-spark-jobs_2.12-1.0.jar
+docker compose exec spark-master /opt/spark/bin/spark-submit   --class KafkaBatchProcessor   --master spark://spark-master:7077   --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0   --jars /opt/spark/jars-custom/postgresql-42.7.3.jar   /opt/spark/apps/target/scala-2.12/ecommerce-pipeline-spark-jobs_2.12-1.0.jar
 ```
 
 ### 7.3. Monitor and Check Results

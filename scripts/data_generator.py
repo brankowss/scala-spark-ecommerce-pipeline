@@ -60,6 +60,8 @@ def generate_transaction_logs():
     """
     Generates a finite batch of transaction log files, distributed
     across the last 5 days to create a realistic dataset for BI dashboards.
+    Includes random generation for EP-7 (high quantity outliers)
+    and EP-10 (invalid CountryIDs).
     """
     invoice_counter = 536365
     print("Generating a batch of historical transaction data...")
@@ -77,27 +79,17 @@ def generate_transaction_logs():
                 stock_code = random.choice(list(PRODUCTS.keys()))
                 quantity = random.randint(1, 10)
 
-                # --- TESTING LOGIC FOR EP-7 ---
-                # To reliably test the business alert, the following block of code was
-                # temporarily used to guarantee the creation of a high-quantity outlier.
-                # It has been commented out for the final production version.
-                
-                # if stock_code == "22752":
-                #     quantity = 9999
-                # else:
-                #     quantity = random.randint(1, 10)
-                # --- END OF TESTING LOGIC ---
+                # --- RANDOM TESTING LOGIC FOR EP-7 (High Quantity Outliers) ---
+                # Roughly 5% of all generated lines will simulate an outlier quantity.
+                if random.random() < 0.05:
+                    quantity = random.randint(2000, 9999)  # simulate abnormal purchase size
 
-                country_field = f"{random.choice(list(COUNTRIES.keys()))}-{random.choice(REGIONS)}"
-                
-                # --- TESTING LOGIC FOR EP-10 ---
-                # This logic intentionally creates some transactions with a non-existent CountryID
-                # to verify that the data quality quarantine process is working correctly.
-                # if invoice_counter % 10 == 0: # Make every 10th invoice invalid for the test
-                #     country_field = f"9999-{random.choice(REGIONS)}"
-                # else:
-                #     country_field = f"{random.choice(list(COUNTRIES.keys()))}-{random.choice(REGIONS)}"
-                # --- END OF TESTING LOGIC ---
+                # --- RANDOM TESTING LOGIC FOR EP-10 (Invalid Country IDs) ---
+                # About 1 in 12 invoices will have an invalid CountryID
+                if invoice_counter % 12 == 0:
+                    country_field = f"9999-{random.choice(REGIONS)}"  # invalid CountryID
+                else:
+                    country_field = f"{random.choice(list(COUNTRIES.keys()))}-{random.choice(REGIONS)}"
 
                 line = f"{invoice_counter},{stock_code},{quantity},{invoice_date},{customer_id},{country_field}"
                 invoice_items.append(line)

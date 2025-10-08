@@ -7,7 +7,8 @@ from email.mime.multipart import MIMEMultipart
 
 def send_alert_email():
     """
-    Sends a formatted email alert with data about high-value orders.
+    Sends a formatted email alert with data about high-value orders (EP-7)
+    and invalid CountryID transactions (EP-10).
     Reads SMTP configuration and recipient email from environment variables.
     """
     # --- Configuration ---
@@ -15,36 +16,44 @@ def send_alert_email():
     sender_password = os.environ.get('JENKINS_EMAIL_APP_PASSWORD')
     recipient_email = os.environ.get('NOTIFICATION_EMAIL')
     smtp_server = "smtp.gmail.com"
-    smtp_port = 465 # For SSL
+    smtp_port = 465  # For SSL
 
+    # --- File paths ---
     outlier_file_path = "reports/outliers.txt"
+    invalid_country_file_path = "reports/invalid_country.txt"
 
-    # --- Check if there is anything to report ---
-    if not os.path.exists(outlier_file_path) or os.path.getsize(outlier_file_path) == 0:
-        print("No outlier file found or file is empty. No alert to send.")
-        return
+    # --- Read EP-7 Outliers ---
+    if os.path.exists(outlier_file_path) and os.path.getsize(outlier_file_path) > 0:
+        with open(outlier_file_path, 'r') as f:
+            outlier_data = f.read()
+    else:
+        outlier_data = "No high-value order anomalies detected.\n"
 
-    # --- Read Outlier Data ---
-    with open(outlier_file_path, 'r') as f:
-        outlier_data = f.read()
+    # --- Read EP-10 Invalid Countries ---
+    if os.path.exists(invalid_country_file_path) and os.path.getsize(invalid_country_file_path) > 0:
+        with open(invalid_country_file_path, 'r') as f:
+            invalid_country_data = f.read()
+    else:
+        invalid_country_data = "No invalid CountryID transactions detected.\n"
 
     # --- Create the Email ---
     message = MIMEMultipart("alternative")
-    message["Subject"] = "⚠️ High-Value Order Alert"
+    message["Subject"] = "⚠️ Data Pipeline Alert: High-Value Orders & Data Quality"
     message["From"] = sender_email
     message["To"] = recipient_email
 
     html_body = f"""
     <html>
-      <body>
-        <h2>High-Value Order Alert</h2>
-        <p>The daily ETL job has detected one or more orders with a total value significantly higher than the average.</p>
-        <p>Please review the following invoices:</p>
+    <body>
+        <h2>Data Pipeline Alerts</h2>
+        <h3>EP-7: High-Value Orders</h3>
         <pre><code>{outlier_data}</code></pre>
-      </body>
+        <h3>EP-10: Invalid CountryID Transactions</h3>
+        <pre><code>{invalid_country_data}</code></pre>
+        <p>Please review the data above for anomalies or data quality issues.</p>
+    </body>
     </html>
     """
-    
     message.attach(MIMEText(html_body, "html"))
 
     # --- Send the Email ---
@@ -55,6 +64,7 @@ def send_alert_email():
         print(f"Alert email successfully sent to {recipient_email}")
     except Exception as e:
         print(f"Failed to send alert email: {e}")
+
 
 if __name__ == "__main__":
     send_alert_email()

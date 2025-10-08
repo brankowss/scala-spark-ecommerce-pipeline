@@ -32,14 +32,13 @@ object LoadDWH {
   }
 
   def main(args: Array[String]): Unit = {
-    
     val spark = SparkSession.builder
       .appName("Load Data Warehouse")
       .config("spark.sql.warehouse.dir", "hdfs://namenode:9000/user/hive/warehouse")
       .config("hive.metastore.uris", "thrift://hive-metastore:9083")
       .enableHiveSupport()
       .getOrCreate()
-      
+
     println("SparkSession created for DWH loading.")
 
     // --- 1. Read from Bronze Layer and Build Star Schema ---
@@ -49,27 +48,34 @@ object LoadDWH {
 
     // Create Dimension tables in memory
     println("Creating dim_date...")
-    val dim_date = df_transactions.select(to_date(col("InvoiceTimestamp")).alias("full_date")).distinct()
+    val dim_date = df_transactions
+      .select(to_date(col("InvoiceTimestamp")).alias("full_date"))
+      .distinct()
       .withColumn("date_id", date_format(col("full_date"), "yyyyMMdd").cast("int"))
       .withColumn("year", year(col("full_date")))
       .withColumn("month", month(col("full_date")))
       .withColumn("day", dayofmonth(col("full_date")))
-    
+
     println("Creating dim_customers...")
     val dim_customers = df_transactions.select(col("CustomerID")).distinct()
       .withColumn("customer_id", col("CustomerID").cast("int"))
 
     println("Creating dim_products...")
-    val dim_products = df_products.select(col("StockCode").alias("product_id"), col("ProductDescription").alias("description")).distinct()
+    val dim_products = df_products
+      .select(col("StockCode").alias("product_id"), col("ProductDescription").alias("description"))
+      .distinct()
 
     println("Creating dim_geography...")
-    val dim_geography = df_countries.select(col("CountryID").alias("geo_id"), col("CountryName").alias("country"), col("ContinentName").alias("continent")).distinct()
+    val dim_geography = df_countries
+      .select(col("CountryID").alias("geo_id"), col("CountryName").alias("country"), col("ContinentName").alias("continent"))
+      .distinct()
 
     // Create Fact table
     println("Creating fct_sales...")
     val df_with_prices = df_transactions.join(
       df_products,
-      df_transactions.col("StockCode") === df_products.col("StockCode") && to_date(df_transactions.col("InvoiceTimestamp")) === df_products.col("Date"),
+      df_transactions.col("StockCode") === df_products.col("StockCode") &&
+      to_date(df_transactions.col("InvoiceTimestamp")) === df_products.col("Date"),
       "inner"
     )
 
@@ -82,7 +88,7 @@ object LoadDWH {
         col("InvoiceNo").alias("invoice_no"),
         col("date_id"),
         col("CustomerID").alias("customer_id"),
-        df_transactions.col("StockCode").alias("product_id"), 
+        df_transactions.col("StockCode").alias("product_id"),
         col("geo_id"),
         col("Quantity").alias("quantity"),
         col("UnitPrice").alias("unit_price"),
@@ -98,56 +104,66 @@ object LoadDWH {
 
     println("Data Warehouse loading complete.")
 
-    // --- 3. Business Logic Alerting (EP-7) - Corrected Logic per Project Spec ---
+    // --- 3. EP-7: Anomaly Detection (High-Quantity Orders) ---
     println("Starting anomaly detection for high-quantity orders...")
     val outlierFilePath = "/opt/spark/reports/outliers.txt"
-
     try {
       if (df_transactions.count() > 0) {
-        
-        // Step 1: Calculate the median and standard deviation of quantity FOR EACH product.
-        val product_stats = df_transactions
-          .groupBy("StockCode")
+        val product_stats = df_transactions.groupBy("StockCode")
           .agg(
             expr("percentile_approx(Quantity, 0.5)").alias("median_quantity"),
             stddev("Quantity").alias("stddev_quantity")
           )
 
-        // Step 2: Join these stats back to the original transactions.
         val transactions_with_stats = df_transactions.join(product_stats, "StockCode")
-
-        // Step 3: Define the threshold and find the outliers.
-        // The rule is: Quantity > median + (2 * stddev)
         val outliers = transactions_with_stats.filter(
           col("Quantity") > col("median_quantity") + (lit(2) * col("stddev_quantity"))
-        ).select("CustomerID", "InvoiceNo", "StockCode", "Quantity", "median_quantity")
-         .distinct()
+        ).select("CustomerID", "InvoiceNo", "StockCode", "Quantity", "median_quantity").distinct()
 
-        // Step 4: Write the results to the outliers.txt file.
         if (outliers.count() > 0) {
           println(s"Found ${outliers.count()} outlier transactions. Writing to ${outlierFilePath}")
           outliers.show()
-          
-          val outlier_data = outliers.collect().map(row => 
-              s"User: ${row.getAs[String]("CustomerID")}, Invoice: ${row.getAs[String]("InvoiceNo")}, Product: ${row.getAs[String]("StockCode")}, Quantity: ${row.getAs[Long]("Quantity")}, Median for Product: ${row.getAs[Double]("median_quantity")}"
+          val outlier_data = outliers.collect().map(row =>
+            s"User: ${row.getAs[String]("CustomerID")}, Invoice: ${row.getAs[String]("InvoiceNo")}, Product: ${row.getAs[String]("StockCode")}, Quantity: ${row.getAs[Long]("Quantity")}, Median: ${row.getAs[Double]("median_quantity")}"
           ).mkString("\n")
-
           new PrintWriter(outlierFilePath) { write(outlier_data); close() }
         } else {
-          println("No outlier transactions found. Creating an empty outliers.txt file.")
+          println("No outlier transactions found. Creating empty outliers.txt file.")
           new PrintWriter(outlierFilePath) { write(""); close() }
         }
       } else {
-        println("No transactions found. Creating an empty outliers.txt file.")
+        println("No transactions found. Creating empty outliers.txt file.")
         new PrintWriter(outlierFilePath) { write(""); close() }
       }
     } catch {
       case e: Exception =>
         println(s"An error occurred during anomaly detection: ${e.getMessage}")
-        println("Creating an empty outliers.txt file to allow pipeline to continue.")
+        println("Creating empty outliers.txt file to allow pipeline to continue.")
         new PrintWriter(outlierFilePath) { write(""); close() }
     }
 
+    // --- 4. EP-10: Data Quality Check (Invalid CountryID) ---
+    println("Starting data quality check for invalid CountryID...")
+    val invalid_country_file_path = "/opt/spark/reports/invalid_country.txt"
+
+    val invalid_countries = df_transactions.join(
+      dim_geography,
+      df_transactions.col("CountryID") === dim_geography.col("geo_id"),
+      "left_anti" // rows with CountryID not in dim_geography
+    )
+
+    if (invalid_countries.count() > 0) {
+      println(s"Found ${invalid_countries.count()} transactions with invalid CountryID. Writing to ${invalid_country_file_path}")
+      invalid_countries.select("InvoiceNo", "StockCode", "Quantity", "CustomerID", "CountryID")
+        .write.mode("overwrite")
+        .option("header", "true")
+        .csv(invalid_country_file_path)
+    } else {
+      println("No invalid CountryID transactions found. Creating empty invalid_country.txt file.")
+      new PrintWriter(invalid_country_file_path) { write(""); close() }
+    }
+
     spark.stop()
+    println("LoadDWH job completed successfully.")
   }
 }

@@ -9,7 +9,6 @@ services:
     hostname: namenode
     volumes:
       - hadoop_namenode_data:/hadoop/dfs/name # Persists HDFS metadata
-      - ./generated_data:/tmp/data_in         # Mounts local data generator output for ingestion
     env_file:
       - ./hadoop-hive.env
     environment:
