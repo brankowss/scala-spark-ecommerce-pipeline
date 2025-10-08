@@ -17,8 +17,8 @@ This is a crucial step that prepares all necessary directories, dependencies, an
 These folders are required by the pipeline for data generation and reporting, and they need to be writable by the Docker containers.
 
 ```bash
-mkdir -p generated_data reports jars db_init
-sudo chmod -R 777 generated_data reports 
+mkdir -p reports jars db_init
+sudo chmod -R 777 reports 
 ```
 
 ### 2.2. Download the PostgreSQL JDBC Driver
